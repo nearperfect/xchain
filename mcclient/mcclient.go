@@ -20,6 +20,7 @@ package mcclient
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -27,8 +28,8 @@ import (
 	"github.com/MOACChain/MoacLib/common/hexutil"
 	"github.com/MOACChain/MoacLib/log"
 	"github.com/MOACChain/MoacLib/rlp"
-	moaccore "github.com/MOACChain/xchain"
 	"github.com/MOACChain/MoacLib/types"
+	moaccore "github.com/MOACChain/xchain"
 	"github.com/MOACChain/xchain/rpc"
 )
 
@@ -51,7 +52,21 @@ func NewClient(c *rpc.Client) *Client {
 	return &Client{c}
 }
 
+func (mcc *Client) Close() {
+	mcc.c.Close()
+}
+
 // Blockchain Access
+
+// ChainId retrieves the current chain ID for transaction replay protection.
+func (mcc *Client) ChainID(ctx context.Context) (*big.Int, error) {
+	var result hexutil.Big
+	err := mcc.c.CallContext(ctx, &result, "mc_chainId")
+	if err != nil {
+		return nil, err
+	}
+	return (*big.Int)(&result), err
+}
 
 // BlockByHash returns the given full block.
 //
@@ -68,6 +83,13 @@ func (mcc *Client) BlockByHash(ctx context.Context, hash common.Hash) (*types.Bl
 // if you don't need all transactions or uncle headers.
 func (mcc *Client) BlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error) {
 	return mcc.getBlock(ctx, "mc_getBlockByNumber", toBlockNumArg(number), true)
+}
+
+// BlockNumber returns the most recent block number
+func (mcc *Client) BlockNumber(ctx context.Context) (uint64, error) {
+	var result hexutil.Uint64
+	err := mcc.c.CallContext(ctx, &result, "mc_blockNumber")
+	return uint64(result), err
 }
 
 type rpcBlock struct {
@@ -173,6 +195,31 @@ func (mcc *Client) TransactionByHash(ctx context.Context, hash common.Hash) (tx 
 		return nil, false, err
 	}
 	return tx, block.BlockNumber == nil, nil
+}
+
+// TransactionSender returns the sender address of the given transaction. The transaction
+// must be known to the remote node and included in the blockchain at the given block and
+// index. The sender is the one derived by the protocol at the time of inclusion.
+//
+// There is a fast-path for transactions retrieved by TransactionByHash and
+// TransactionInBlock. Getting their sender address can be done without an RPC interaction.
+func (mcc *Client) TransactionSender(ctx context.Context, tx *types.Transaction, block common.Hash, index uint) (common.Address, error) {
+	// Try to load the address from the cache.
+	sender, err := types.Sender(&senderFromServer{blockhash: block}, tx)
+	if err == nil {
+		return sender, nil
+	}
+	var meta struct {
+		Hash common.Hash
+		From common.Address
+	}
+	if err = mcc.c.CallContext(ctx, &meta, "eth_getTransactionByBlockHashAndIndex", block, hexutil.Uint64(index)); err != nil {
+		return common.Address{}, err
+	}
+	if meta.Hash == (common.Hash{}) || meta.Hash != tx.Hash() {
+		return common.Address{}, errors.New("wrong inclusion block/index")
+	}
+	return meta.From, nil
 }
 
 // TransactionCount returns the total number of transactions in the given block.
@@ -451,14 +498,4 @@ func toCallArg(msg moaccore.CallMsg) interface{} {
 		arg["gasPrice"] = (*hexutil.Big)(msg.GasPrice)
 	}
 	return arg
-}
-
-// returns the SCS info with the vnode.
-func (mcc *Client) getSCSInfo(ctx context.Context, hash common.Hash) (*types.Header, error) {
-	var head *types.Header
-	err := mcc.c.CallContext(ctx, &head, "mc_getBlockByHash", hash, false)
-	if err == nil && head == nil {
-		err = moaccore.NotFound
-	}
-	return head, err
 }
