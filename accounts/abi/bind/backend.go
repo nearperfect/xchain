@@ -1,18 +1,18 @@
-// Copyright 2015 The MOAC-core Authors
-// This file is part of the MOAC-core library.
+// Copyright 2015 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The MOAC-core library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The MOAC-core library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the MOAC-core library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package bind
 
@@ -22,8 +22,8 @@ import (
 	"math/big"
 
 	"github.com/MOACChain/MoacLib/common"
-	"github.com/MOACChain/xchain"
 	"github.com/MOACChain/MoacLib/types"
+	"github.com/MOACChain/xchain"
 )
 
 var (
@@ -41,21 +41,15 @@ var (
 	ErrNoCodeAfterDeploy = errors.New("no contract code after deployment")
 )
 
-// ContractCaller defines the methods needed to allow operating with contract on a read
+// ContractCaller defines the methods needed to allow operating with a contract on a read
 // only basis.
 type ContractCaller interface {
 	// CodeAt returns the code of the given account. This is needed to differentiate
 	// between contract internal errors and the local chain being out of sync.
 	CodeAt(ctx context.Context, contract common.Address, blockNumber *big.Int) ([]byte, error)
-	// ContractCall executes an MoacNode contract call with the specified data as the
+	// ContractCall executes an Ethereum contract call with the specified data as the
 	// input.
 	CallContract(ctx context.Context, call moaccore.CallMsg, blockNumber *big.Int) ([]byte, error)
-}
-
-// DeployBackend wraps the operations needed by WaitMined and WaitDeployed.
-type DeployBackend interface {
-	TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error)
-	CodeAt(ctx context.Context, account common.Address, blockNumber *big.Int) ([]byte, error)
 }
 
 // PendingContractCaller defines methods to perform contract calls on the pending state.
@@ -64,12 +58,12 @@ type DeployBackend interface {
 type PendingContractCaller interface {
 	// PendingCodeAt returns the code of the given account in the pending state.
 	PendingCodeAt(ctx context.Context, contract common.Address) ([]byte, error)
-	// PendingCallContract executes an MoacNode contract call against the pending state.
+	// PendingCallContract executes an Ethereum contract call against the pending state.
 	PendingCallContract(ctx context.Context, call moaccore.CallMsg) ([]byte, error)
 }
 
-// ContractTransactor defines the methods needed to allow operating with contract
-// on a write only basis. Beside the transacting method, the remainder are helpers
+// ContractTransactor defines the methods needed to allow operating with a contract
+// on a write only basis. Besides the transacting method, the remainder are helpers
 // used when the user does not provide some needed values, but rather leaves it up
 // to the transactor to decide.
 type ContractTransactor interface {
@@ -85,13 +79,34 @@ type ContractTransactor interface {
 	// There is no guarantee that this is the true gas limit requirement as other
 	// transactions may be added or removed by miners, but it should provide a basis
 	// for setting a reasonable default.
-	EstimateGas(ctx context.Context, call moaccore.CallMsg) (usedGas *big.Int, err error)
+	EstimateGas(ctx context.Context, call moaccore.CallMsg) (gas uint64, err error)
 	// SendTransaction injects the transaction into the pending pool for execution.
 	SendTransaction(ctx context.Context, tx *types.Transaction) error
+}
+
+// ContractFilterer defines the methods needed to access log events using one-off
+// queries or continuous event subscriptions.
+type ContractFilterer interface {
+	// FilterLogs executes a log filter operation, blocking during execution and
+	// returning all the results in one batch.
+	//
+	// TODO(karalabe): Deprecate when the subscription one can return past data too.
+	FilterLogs(ctx context.Context, query moaccore.FilterQuery) ([]types.Log, error)
+
+	// SubscribeFilterLogs creates a background log filtering operation, returning
+	// a subscription immediately, which can be used to stream the found events.
+	SubscribeFilterLogs(ctx context.Context, query moaccore.FilterQuery, ch chan<- types.Log) (moaccore.Subscription, error)
+}
+
+// DeployBackend wraps the operations needed by WaitMined and WaitDeployed.
+type DeployBackend interface {
+	TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error)
+	CodeAt(ctx context.Context, account common.Address, blockNumber *big.Int) ([]byte, error)
 }
 
 // ContractBackend defines the methods needed to work with contracts on a read-write basis.
 type ContractBackend interface {
 	ContractCaller
 	ContractTransactor
+	ContractFilterer
 }

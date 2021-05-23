@@ -29,7 +29,7 @@ import (
 	"github.com/MOACChain/MoacLib/log"
 	"github.com/MOACChain/MoacLib/rlp"
 	"github.com/MOACChain/MoacLib/types"
-	moaccore "github.com/MOACChain/xchain"
+	xchain "github.com/MOACChain/xchain"
 	"github.com/MOACChain/xchain/rpc"
 )
 
@@ -104,7 +104,7 @@ func (mcc *Client) getBlock(ctx context.Context, method string, args ...interfac
 	if err != nil {
 		return nil, err
 	} else if len(raw) == 0 {
-		return nil, moaccore.NotFound
+		return nil, xchain.NotFound
 	}
 	// Decode header and transactions.
 	var head *types.Header
@@ -160,7 +160,7 @@ func (mcc *Client) HeaderByHash(ctx context.Context, hash common.Hash) (*types.H
 	var head *types.Header
 	err := mcc.c.CallContext(ctx, &head, "mc_getBlockByHash", hash, false)
 	if err == nil && head == nil {
-		err = moaccore.NotFound
+		err = xchain.NotFound
 	}
 	return head, err
 }
@@ -171,7 +171,7 @@ func (mcc *Client) HeaderByNumber(ctx context.Context, number *big.Int) (*types.
 	var head *types.Header
 	err := mcc.c.CallContext(ctx, &head, "mc_getBlockByNumber", toBlockNumArg(number), false)
 	if err == nil && head == nil {
-		err = moaccore.NotFound
+		err = xchain.NotFound
 	}
 	return head, err
 }
@@ -183,7 +183,7 @@ func (mcc *Client) TransactionByHash(ctx context.Context, hash common.Hash) (tx 
 	if err != nil {
 		return nil, false, err
 	} else if len(raw) == 0 {
-		return nil, false, moaccore.NotFound
+		return nil, false, xchain.NotFound
 	}
 	if err := json.Unmarshal(raw, &tx); err != nil {
 		return nil, false, err
@@ -235,7 +235,7 @@ func (mcc *Client) TransactionInBlock(ctx context.Context, blockHash common.Hash
 	err := mcc.c.CallContext(ctx, &tx, "mc_getTransactionByBlockHashAndIndex", blockHash, hexutil.Uint64(index))
 	if err == nil {
 		if tx == nil {
-			return nil, moaccore.NotFound
+			return nil, xchain.NotFound
 		} else if _, r, _ := tx.RawSignatureValues(); r == nil {
 			return nil, fmt.Errorf("server returned transaction without signature")
 		}
@@ -250,7 +250,7 @@ func (mcc *Client) TransactionReceipt(ctx context.Context, txHash common.Hash) (
 	err := mcc.c.CallContext(ctx, &r, "mc_getTransactionReceipt", txHash)
 	if err == nil {
 		if r == nil {
-			return nil, moaccore.NotFound
+			return nil, xchain.NotFound
 		}
 	}
 	return r, err
@@ -273,7 +273,7 @@ type rpcProgress struct {
 
 // SyncProgress retrieves the current progress of the sync algorithm. If there's
 // no sync currently running, it returns nil.
-func (mcc *Client) SyncProgress(ctx context.Context) (*moaccore.SyncProgress, error) {
+func (mcc *Client) SyncProgress(ctx context.Context) (*xchain.SyncProgress, error) {
 	var raw json.RawMessage
 	if err := mcc.c.CallContext(ctx, &raw, "mc_syncing"); err != nil {
 		return nil, err
@@ -287,7 +287,7 @@ func (mcc *Client) SyncProgress(ctx context.Context) (*moaccore.SyncProgress, er
 	if err := json.Unmarshal(raw, &progress); err != nil {
 		return nil, err
 	}
-	return &moaccore.SyncProgress{
+	return &xchain.SyncProgress{
 		StartingBlock: uint64(progress.StartingBlock),
 		CurrentBlock:  uint64(progress.CurrentBlock),
 		HighestBlock:  uint64(progress.HighestBlock),
@@ -298,7 +298,7 @@ func (mcc *Client) SyncProgress(ctx context.Context) (*moaccore.SyncProgress, er
 
 // SubscribeNewHead subscribes to notifications about the current blockchain head
 // on the given channel.
-func (mcc *Client) SubscribeNewHead(ctx context.Context, ch chan<- *types.Header) (moaccore.Subscription, error) {
+func (mcc *Client) SubscribeNewHead(ctx context.Context, ch chan<- *types.Header) (xchain.Subscription, error) {
 	return mcc.c.McSubscribe(ctx, ch, "newHeads", map[string]struct{}{})
 }
 
@@ -352,18 +352,18 @@ func (mcc *Client) NonceAt(ctx context.Context, account common.Address, blockNum
 // Filters
 
 // FilterLogs executes a filter query.
-func (mcc *Client) FilterLogs(ctx context.Context, q moaccore.FilterQuery) ([]types.Log, error) {
+func (mcc *Client) FilterLogs(ctx context.Context, q xchain.FilterQuery) ([]types.Log, error) {
 	var result []types.Log
 	err := mcc.c.CallContext(ctx, &result, "mc_getLogs", toFilterArg(q))
 	return result, err
 }
 
 // SubscribeFilterLogs subscribes to the results of a streaming filter query.
-func (mcc *Client) SubscribeFilterLogs(ctx context.Context, q moaccore.FilterQuery, ch chan<- types.Log) (moaccore.Subscription, error) {
+func (mcc *Client) SubscribeFilterLogs(ctx context.Context, q xchain.FilterQuery, ch chan<- types.Log) (xchain.Subscription, error) {
 	return mcc.c.McSubscribe(ctx, ch, "logs", toFilterArg(q))
 }
 
-func toFilterArg(q moaccore.FilterQuery) interface{} {
+func toFilterArg(q xchain.FilterQuery) interface{} {
 	arg := map[string]interface{}{
 		"fromBlock": toBlockNumArg(q.FromBlock),
 		"toBlock":   toBlockNumArg(q.ToBlock),
@@ -424,7 +424,7 @@ func (mcc *Client) PendingTransactionCount(ctx context.Context) (uint, error) {
 // blockNumber selects the block height at which the call runs. It can be nil, in which
 // case the code is taken from the latest known block. Note that state from very old
 // blocks might not be available.
-func (mcc *Client) CallContract(ctx context.Context, msg moaccore.CallMsg, blockNumber *big.Int) ([]byte, error) {
+func (mcc *Client) CallContract(ctx context.Context, msg xchain.CallMsg, blockNumber *big.Int) ([]byte, error) {
 	var hex hexutil.Bytes
 	err := mcc.c.CallContext(ctx, &hex, "mc_call", toCallArg(msg), toBlockNumArg(blockNumber))
 	if err != nil {
@@ -435,7 +435,7 @@ func (mcc *Client) CallContract(ctx context.Context, msg moaccore.CallMsg, block
 
 // PendingCallContract executes a message call transaction using the EVM.
 // The state seen by the contract call is the pending state.
-func (mcc *Client) PendingCallContract(ctx context.Context, msg moaccore.CallMsg) ([]byte, error) {
+func (mcc *Client) PendingCallContract(ctx context.Context, msg xchain.CallMsg) ([]byte, error) {
 	var hex hexutil.Bytes
 	err := mcc.c.CallContext(ctx, &hex, "mc_call", toCallArg(msg), "pending")
 	if err != nil {
@@ -458,7 +458,7 @@ func (mcc *Client) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
 // the current pending state of the backend blockchain. There is no guarantee that this is
 // the true gas limit requirement as other transactions may be added or removed by miners,
 // but it should provide a basis for setting a reasonable default.
-func (mcc *Client) EstimateGas(ctx context.Context, msg moaccore.CallMsg) (*big.Int, error) {
+func (mcc *Client) EstimateGas(ctx context.Context, msg xchain.CallMsg) (*big.Int, error) {
 	var hex hexutil.Big
 	err := mcc.c.CallContext(ctx, &hex, "mc_estimateGas", toCallArg(msg))
 	if err != nil {
@@ -480,7 +480,7 @@ func (mcc *Client) SendTransaction(ctx context.Context, tx *types.Transaction) e
 	return mcc.c.CallContext(ctx, nil, "mc_sendRawTransaction", common.ToHex(data))
 }
 
-func toCallArg(msg moaccore.CallMsg) interface{} {
+func toCallArg(msg xchain.CallMsg) interface{} {
 	arg := map[string]interface{}{
 		"from": msg.From,
 		"to":   msg.To,

@@ -18,7 +18,6 @@ package main
 
 import (
 	"bufio"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -30,7 +29,6 @@ import (
 
 	"github.com/MOACChain/MoacLib/log"
 	"github.com/MOACChain/xchain/cmd/utils"
-	"github.com/MOACChain/xchain/contracts/release"
 	"github.com/MOACChain/xchain/mc"
 	"github.com/MOACChain/xchain/node"
 	"github.com/MOACChain/xchain/params"
@@ -154,20 +152,6 @@ func makeFullNode(ctx *cli.Context) *node.Node {
 		utils.RegisterMcStatsService(n, cfg.Mcstats.URL)
 	}
 
-	// Add the release oracle service so it boots along with node.
-	if err := n.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		config := release.Config{
-			Oracle: relOracle,
-			Major:  uint32(params.VersionMajor),
-			Minor:  uint32(params.VersionMinor),
-			Patch:  uint32(params.VersionPatch),
-		}
-		commit, _ := hex.DecodeString(gitCommit)
-		copy(config.Commit[:], commit)
-		return release.NewReleaseService(ctx, config)
-	}); err != nil {
-		utils.Fatalf("Failed to register the Moac release oracle service: %v", err)
-	}
 	return n
 }
 
