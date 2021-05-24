@@ -458,13 +458,14 @@ func (mcc *Client) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
 // the current pending state of the backend blockchain. There is no guarantee that this is
 // the true gas limit requirement as other transactions may be added or removed by miners,
 // but it should provide a basis for setting a reasonable default.
-func (mcc *Client) EstimateGas(ctx context.Context, msg xchain.CallMsg) (*big.Int, error) {
+func (mcc *Client) EstimateGas(ctx context.Context, msg xchain.CallMsg) (uint64, error) {
 	var hex hexutil.Big
 	err := mcc.c.CallContext(ctx, &hex, "mc_estimateGas", toCallArg(msg))
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
-	return (*big.Int)(&hex), nil
+	ret := (*big.Int)(&hex)
+	return ret.Uint64(), nil
 }
 
 // SendTransaction injects a signed transaction into the pending pool for execution.

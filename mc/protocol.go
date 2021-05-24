@@ -23,15 +23,15 @@ import (
 
 	"github.com/MOACChain/MoacLib/common"
 	"github.com/MOACChain/MoacLib/rlp"
-	"github.com/MOACChain/xchain/core"
 	"github.com/MOACChain/MoacLib/types"
+	"github.com/MOACChain/xchain/core"
 	"github.com/MOACChain/xchain/event"
 )
 
 // Constants to match up protocol versions and messages
 const (
-	mc62 = 62
-	mc63 = 63
+	mc62 = 10062
+	mc63 = 10063
 )
 
 // Official short name of the protocol used during capability negotiation.

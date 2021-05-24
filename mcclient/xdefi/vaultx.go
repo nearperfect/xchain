@@ -1,25 +1,25 @@
 // Code generated - DO NOT EDIT.
 // This file is a generated binding and any manual changes will be lost.
 
-package main
+package xdefi
 
 import (
 	"math/big"
 	"strings"
 
 	"github.com/MOACChain/MoacLib/common"
+	"github.com/MOACChain/MoacLib/types"
+	moaccore "github.com/MOACChain/xchain"
 	"github.com/MOACChain/xchain/accounts/abi"
 	"github.com/MOACChain/xchain/accounts/abi/bind"
-	ethereum "github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/event"
+	"github.com/MOACChain/xchain/event"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
 var (
 	_ = big.NewInt
 	_ = strings.NewReader
-	_ = ethereum.NotFound
+	_ = moaccore.NotFound
 	_ = bind.Bind
 	_ = common.Big1
 	_ = types.BloomLookup
@@ -1042,7 +1042,7 @@ type VaultXPausedIterator struct {
 	event    string              // Event name to use for unpacking event data
 
 	logs chan types.Log        // Log channel receiving the found contract events
-	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	sub  moaccore.Subscription // Subscription for errors, completion and termination
 	done bool                  // Whether the subscription completed delivering logs
 	fail error                 // Occurred error to stop iteration
 }
@@ -1176,7 +1176,7 @@ type VaultXRoleAdminChangedIterator struct {
 	event    string              // Event name to use for unpacking event data
 
 	logs chan types.Log        // Log channel receiving the found contract events
-	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	sub  moaccore.Subscription // Subscription for errors, completion and termination
 	done bool                  // Whether the subscription completed delivering logs
 	fail error                 // Occurred error to stop iteration
 }
@@ -1338,7 +1338,7 @@ type VaultXRoleGrantedIterator struct {
 	event    string              // Event name to use for unpacking event data
 
 	logs chan types.Log        // Log channel receiving the found contract events
-	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	sub  moaccore.Subscription // Subscription for errors, completion and termination
 	done bool                  // Whether the subscription completed delivering logs
 	fail error                 // Occurred error to stop iteration
 }
@@ -1500,7 +1500,7 @@ type VaultXRoleRevokedIterator struct {
 	event    string              // Event name to use for unpacking event data
 
 	logs chan types.Log        // Log channel receiving the found contract events
-	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	sub  moaccore.Subscription // Subscription for errors, completion and termination
 	done bool                  // Whether the subscription completed delivering logs
 	fail error                 // Occurred error to stop iteration
 }
@@ -1662,7 +1662,7 @@ type VaultXTokenDepositIterator struct {
 	event    string              // Event name to use for unpacking event data
 
 	logs chan types.Log        // Log channel receiving the found contract events
-	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	sub  moaccore.Subscription // Subscription for errors, completion and termination
 	done bool                  // Whether the subscription completed delivering logs
 	fail error                 // Occurred error to stop iteration
 }
@@ -1829,7 +1829,7 @@ type VaultXTokenWithdrawIterator struct {
 	event    string              // Event name to use for unpacking event data
 
 	logs chan types.Log        // Log channel receiving the found contract events
-	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	sub  moaccore.Subscription // Subscription for errors, completion and termination
 	done bool                  // Whether the subscription completed delivering logs
 	fail error                 // Occurred error to stop iteration
 }
@@ -1996,7 +1996,7 @@ type VaultXUnpausedIterator struct {
 	event    string              // Event name to use for unpacking event data
 
 	logs chan types.Log        // Log channel receiving the found contract events
-	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	sub  moaccore.Subscription // Subscription for errors, completion and termination
 	done bool                  // Whether the subscription completed delivering logs
 	fail error                 // Occurred error to stop iteration
 }

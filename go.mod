@@ -1,6 +1,6 @@
 module github.com/MOACChain/xchain
 
-go 1.14
+go 1.16
 
 require (
 	github.com/MOACChain/MoacLib v1.0.5
