@@ -87,46 +87,33 @@ type Result struct {
 
 // worker is the main object which takes care of applying messages to the new state
 type worker struct {
-	config *params.ChainConfig
-	engine consensus.Engine
-
-	mu sync.Mutex
-
-	// update loop
-	mux   *event.TypeMux
-	txCh  chan core.TxPreEvent
-	txSub event.Subscription
-	//txShard      chan core.TxShardJoinEvent
-	//txShardSub   event.Subscription
-	chainHeadCh  chan core.ChainHeadEvent
-	chainHeadSub event.Subscription
-	chainSideCh  chan core.ChainSideEvent
-	chainSideSub event.Subscription
-	wg           sync.WaitGroup
-
-	agents map[Agent]struct{}
-	recv   chan *Result
-
-	mc      Backend
-	nr      NetworkRelay
-	chain   *core.BlockChain
-	proc    core.Validator
-	chainDb mcdb.Database
-
-	coinbase common.Address
-	extra    []byte
-
-	currentMu sync.Mutex
-	current   *Work
-
+	config         *params.ChainConfig
+	engine         consensus.Engine
+	mu             sync.Mutex
+	mux            *event.TypeMux
+	txCh           chan core.TxPreEvent
+	txSub          event.Subscription
+	chainHeadCh    chan core.ChainHeadEvent
+	chainHeadSub   event.Subscription
+	chainSideCh    chan core.ChainSideEvent
+	chainSideSub   event.Subscription
+	wg             sync.WaitGroup
+	agents         map[Agent]struct{}
+	recv           chan *Result
+	mc             Backend
+	nr             NetworkRelay
+	chain          *core.BlockChain
+	proc           core.Validator
+	chainDb        mcdb.Database
+	coinbase       common.Address
+	extra          []byte
+	currentMu      sync.Mutex
+	current        *Work
 	uncleMu        sync.Mutex
 	possibleUncles map[common.Hash]*types.Block
-
-	unconfirmed *unconfirmedBlocks // set of locally mined blocks pending canonicalness confirmations
-
-	// atomic status counters
-	mining int32
-	atWork int32
+	unconfirmed    *unconfirmedBlocks
+	mining         int32
+	atWork         int32
 }
 
 func newWorker(config *params.ChainConfig, engine consensus.Engine, coinbase common.Address, mc Backend, mux *event.TypeMux, nr NetworkRelay) *worker {

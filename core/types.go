@@ -22,7 +22,6 @@ import (
 	"github.com/MOACChain/MoacLib/state"
 	"github.com/MOACChain/MoacLib/types"
 	"github.com/MOACChain/MoacLib/vm"
-
 )
 
 // Validator is an interface which defines the standard for block validation. It
@@ -47,5 +46,3 @@ type Validator interface {
 type Processor interface {
 	Process(block *types.Block, statedb *state.StateDB, cfg vm.Config, nr vm.NetworkRelayInterface, liveFlag bool) (types.Receipts, []*types.Log, *big.Int, error)
 }
-
-

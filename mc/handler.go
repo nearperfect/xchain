@@ -47,6 +47,7 @@ import (
 	"github.com/MOACChain/xchain/node"
 	"github.com/MOACChain/xchain/p2p"
 	"github.com/MOACChain/xchain/p2p/discover"
+	"github.com/MOACChain/xchain/sentinel"
 	"github.com/MOACChain/xchain/vnode"
 	gocache "github.com/patrickmn/go-cache"
 )
@@ -58,6 +59,7 @@ const (
 	// txChanSize is the size of channel listening to TxPreEvent.
 	// The number is referenced from the size of tx pool.
 	txChanSize         = 4096
+	vaultEventChanSize = 8192
 	shardingTxChanSize = 8192
 	scsMsgChanSize     = 1000
 	txSyncChanSize     = 4096
@@ -116,6 +118,7 @@ type ProtocolManager struct {
 	fastSync        uint32 // Flag whether fast sync is enabled (gets disabled if we already have blocks)
 	acceptTxs       uint32 // Flag whether we're considered synchronised (enables transaction processing)
 	txpool          txPool
+	sentinel        *sentinel.Sentinel
 	blockchain      *core.BlockChain
 	chaindb         mcdb.Database
 	chainconfig     *params.ChainConfig
@@ -128,6 +131,8 @@ type ProtocolManager struct {
 	eventMux        *event.TypeMux
 	txCh            chan core.TxPreEvent // chan for mainnet transactions
 	txSub           event.Subscription
+	vaultEventCh    chan core.VaultEvent // chan for vault events
+	vaultEventSub   event.Subscription
 	shardingTxCh    chan core.ShardingTxEvent // chan for sharding chan transactions
 	shardingTxSub   event.Subscription
 	minedBlockSub   *event.TypeMuxSubscription
@@ -186,6 +191,7 @@ func NewProtocolManager(
 	networkId uint64,
 	mux *event.TypeMux,
 	txpool txPool,
+	sentinel *sentinel.Sentinel,
 	engine consensus.Engine,
 	blockchain *core.BlockChain,
 	chaindb mcdb.Database,
@@ -345,6 +351,9 @@ func (pm *ProtocolManager) removePeer(id string, subnet string) {
 func (pm *ProtocolManager) Start(maxPeers int) {
 	pm.p2pManager.maxPeers = maxPeers
 
+	// broadcast vault events
+	pm.vaultEventCh = make(chan core.VaultEvent, vaultEventChanSize)
+	pm.vaultEventSub = pm.sentinel.SubscribeVaultEvent(pm.vaultEventCh)
 	// broadcast transactions
 	pm.txCh = make(chan core.TxPreEvent, txChanSize)
 	pm.txSub = pm.txpool.SubscribeTxPreEvent(pm.txCh)
@@ -352,7 +361,11 @@ func (pm *ProtocolManager) Start(maxPeers int) {
 	pm.shardingTxCh = make(chan core.ShardingTxEvent, shardingTxChanSize)
 	pm.shardingTxSub = pm.txpool.SubscribeShardingTxEvent(pm.shardingTxCh)
 
+	// broadcast tx
 	go pm.txBroadcastLoop()
+
+	// broadcast vault events
+	go pm.vaultEventBroadcastLoop()
 
 	// broadcast mined blocks
 	pm.minedBlockSub = pm.eventMux.Subscribe(core.NewMinedBlockEvent{})
@@ -888,6 +901,8 @@ func (pm *ProtocolManager) handleSubnetMsg(p *Peer, msg p2p.Msg) error {
 		}
 		pm.NetworkRelay.BroadcastMsg(&scsMsg, forceToMainnet)
 
+	case msg.Code == VaultEventMsg:
+		log.Infof("  vault event received !!!!!!!!!!!!!!")
 	case msg.Code == TxMsg:
 		var txs, txsShard []*types.Transaction
 		// Transactions can be processed, parse all of them and deliver to the pool
@@ -1356,6 +1371,18 @@ func (pm *ProtocolManager) BroadcastTx(tx *types.Transaction) {
 	}
 }
 
+func (pm *ProtocolManager) BroadcastVaultEvent(vaultEvent *core.VaultEvent) {
+	log.Debugf("Vault event: %s", vaultEvent)
+	peerSet := pm.p2pManager.peerSet
+	if peerSet == nil {
+		return
+	}
+	peers := peerSet.PeersWithoutVaultEvent(vaultEvent.Hash())
+	for _, peer := range peers {
+		peer.AsyncSendVaultEvents(core.VaultEvents{vaultEvent})
+	}
+}
+
 func (pm *ProtocolManager) BroadcastPushResToPeerSet(msg *pb.ScsPushMsg, peerSet *PeerSet) {
 	peers := peerSet.PeersWithoutSCSMsg(msg)
 	for _, peer := range peers {
@@ -1393,6 +1420,18 @@ func (pm *ProtocolManager) txBroadcastLoop() {
 		case <-pm.shardingTxSub.Err():
 			return
 		case <-pm.txSub.Err():
+			return
+		}
+	}
+}
+
+func (pm *ProtocolManager) vaultEventBroadcastLoop() {
+	for {
+		select {
+		case event := <-pm.vaultEventCh:
+			pm.BroadcastVaultEvent(&event)
+			return
+		case <-pm.vaultEventSub.Err():
 			return
 		}
 	}

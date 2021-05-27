@@ -31,6 +31,7 @@ import (
 	pb "github.com/MOACChain/MoacLib/proto"
 	"github.com/MOACChain/MoacLib/rlp"
 	"github.com/MOACChain/MoacLib/types"
+	"github.com/MOACChain/xchain/core"
 	"github.com/MOACChain/xchain/p2p"
 	"github.com/MOACChain/xchain/p2p/discover"
 )
@@ -42,16 +43,18 @@ var (
 )
 
 const (
-	maxKnownMsgs     = 3276800 // Maximum directcall msgs requestid to keep in the known list (prevent DOS)
-	maxKnownTxs      = 32768   // Maximum transactions hashes to keep in the known list (prevent DOS)
-	maxKnownBlocks   = 1024    // Maximum block hashes to keep in the known list (prevent DOS)
-	handshakeTimeout = 5 * time.Second
+	maxKnownMsgs        = 3276800 // Maximum directcall msgs requestid to keep in the known list (prevent DOS)
+	maxKnownTxs         = 32768   // Maximum transactions hashes to keep in the known list (prevent DOS)
+	maxKnownBlocks      = 1024    // Maximum block hashes to keep in the known list (prevent DOS)
+	maxKnownVaultEvents = 32768   // Maximum transactions hashes to keep in the known list (prevent DOS)
+	handshakeTimeout    = 5 * time.Second
 
-	maxQueuedTxs   = 512  // maxQueuedTxs is the maximum number of transaction lists to queue up
-	maxQueuedProps = 8    // maxQueuedProps is the maximum number of block propagations to queue up
-	maxQueuedAnns  = 8    // maxQueuedAnns is the maximum number of block announcements to queue up
-	maxQueuedMsgs  = 1000 // maxQueuedProps is the maximum number of scs msgs to queue up
-	maxQueuedRes   = 8    // maxQueuedAnns is the maximum number of scs  res to queue up
+	maxQueuedTxs         = 512  // maxQueuedTxs is the maximum number of transaction lists to queue up
+	maxQueuedVaultEvents = 512  // maxQueuedVaultEvents is the maximum number of vault events lists to queue up
+	maxQueuedProps       = 8    // maxQueuedProps is the maximum number of block propagations to queue up
+	maxQueuedAnns        = 8    // maxQueuedAnns is the maximum number of block announcements to queue up
+	maxQueuedMsgs        = 1000 // maxQueuedProps is the maximum number of scs msgs to queue up
+	maxQueuedRes         = 8    // maxQueuedAnns is the maximum number of scs  res to queue up
 )
 
 // PeerInfo represents a short summary of the MoacNode sub-protocol metadata known
@@ -72,42 +75,45 @@ type Peer struct {
 	id string
 
 	*p2p.Peer
-	rw          p2p.MsgReadWriter
-	version     int         // Protocol version negotiated
-	forkDrop    *time.Timer // Timed connection dropper if forks aren't validated in time
-	head        common.Hash
-	td          *big.Int
-	lock        sync.RWMutex
-	subnet      string
-	knownTxs    *set.Set                // Set of transaction hashes known to be known by this Peer
-	knownBlocks *set.Set                // Set of block hashes known to be known by this Peer
-	knownMsgs   *set.Set                // Set of msg request ids known to be sent to the Peer
-	queuedTxs   chan types.Transactions // Queue of transactions to broadcast to the peer
-	queuedProps chan *propEvent         // Queue of blocks to broadcast to the peer
-	queuedAnns  chan *types.Block       // Queue of blocks to announce to the peer
-	queuedMsgs  chan *pb.ScsPushMsg     // Queue of scs msgs to broadcast to the peer
-	queuedRes   chan *pb.ScsPushMsg     // Queue of scs Res to broadcast to the peer
-	term        chan struct{}           // Termination channel to stop the broadcaster
+	rw                p2p.MsgReadWriter
+	version           int         // Protocol version negotiated
+	forkDrop          *time.Timer // Timed connection dropper if forks aren't validated in time
+	head              common.Hash
+	td                *big.Int
+	lock              sync.RWMutex
+	subnet            string
+	knownTxs          *set.Set                // Set of transaction hashes known to be known by this Peer
+	knownBlocks       *set.Set                // Set of block hashes known to be known by this Peer
+	knownMsgs         *set.Set                // Set of msg request ids known to be sent to the Peer
+	knownVaultEvents  *set.Set                // Set of vault event hashes known to be known by this Peer
+	queuedTxs         chan types.Transactions // Queue of transactions to broadcast to the peer
+	queuedVaultEvents chan core.VaultEvents   // Queue of vault events to broadcast to the peer
+	queuedProps       chan *propEvent         // Queue of blocks to broadcast to the peer
+	queuedAnns        chan *types.Block       // Queue of blocks to announce to the peer
+	queuedMsgs        chan *pb.ScsPushMsg     // Queue of scs msgs to broadcast to the peer
+	queuedRes         chan *pb.ScsPushMsg     // Queue of scs Res to broadcast to the peer
+	term              chan struct{}           // Termination channel to stop the broadcaster
 }
 
 func newPeer(version int, p *p2p.Peer, rw p2p.MsgReadWriter) *Peer {
 	id := p.ID()
 
 	return &Peer{
-		Peer:        p,
-		rw:          rw,
-		version:     version,
-		id:          fmt.Sprintf("%x", id[:8]),
-		knownTxs:    set.New(),
-		knownBlocks: set.New(),
-		knownMsgs:   set.New(),
-		queuedTxs:   make(chan types.Transactions, maxQueuedTxs),
-		queuedProps: make(chan *propEvent, maxQueuedProps),
-		queuedAnns:  make(chan *types.Block, maxQueuedAnns),
-		queuedMsgs:  make(chan *pb.ScsPushMsg, maxQueuedMsgs),
-		queuedRes:   make(chan *pb.ScsPushMsg, maxQueuedRes),
-		term:        make(chan struct{}),
-		subnet:      p.Subnet(),
+		Peer:             p,
+		rw:               rw,
+		version:          version,
+		id:               fmt.Sprintf("%x", id[:8]),
+		knownTxs:         set.New(),
+		knownBlocks:      set.New(),
+		knownMsgs:        set.New(),
+		knownVaultEvents: set.New(),
+		queuedTxs:        make(chan types.Transactions, maxQueuedTxs),
+		queuedProps:      make(chan *propEvent, maxQueuedProps),
+		queuedAnns:       make(chan *types.Block, maxQueuedAnns),
+		queuedMsgs:       make(chan *pb.ScsPushMsg, maxQueuedMsgs),
+		queuedRes:        make(chan *pb.ScsPushMsg, maxQueuedRes),
+		term:             make(chan struct{}),
+		subnet:           p.Subnet(),
 	}
 }
 
@@ -117,6 +123,10 @@ func newPeer(version int, p *p2p.Peer, rw p2p.MsgReadWriter) *Peer {
 func (p *Peer) broadcastloop() {
 	for {
 		select {
+		case vaultEvents := <-p.queuedVaultEvents:
+			if err := p.SendVaultEvents(vaultEvents); err != nil {
+				return
+			}
 		case txs := <-p.queuedTxs:
 			if err := p.SendTransactions(txs); err != nil {
 				return
@@ -214,6 +224,16 @@ func (p *Peer) MarkTransaction(hash common.Hash) {
 	p.knownTxs.Add(hash)
 }
 
+// MarkTransaction marks a transaction as known for the Peer, ensuring that it
+// will never be propagated to this particular Peer.
+func (p *Peer) MarkVaultEvent(hash common.Hash) {
+	// If we reached the memory allowance, drop a previously known vault event hash
+	for p.knownVaultEvents.Size() >= maxKnownVaultEvents {
+		p.knownVaultEvents.Pop()
+	}
+	p.knownVaultEvents.Add(hash)
+}
+
 // SendTransactions sends transactions to the Peer and includes the hashes
 // in its transaction hash set for future reference.
 func (p *Peer) SendTransactions(txs types.Transactions) error {
@@ -223,6 +243,17 @@ func (p *Peer) SendTransactions(txs types.Transactions) error {
 
 	log.Debugf("p2p send txmsg for %s", p.subnet)
 	return p2p.Send(p.rw, TxMsg, txs)
+}
+
+// SendVaultEvents sends vault events to the Peer and includes the hashes
+// in its vault events hash set for future reference.
+func (p *Peer) SendVaultEvents(vaultEvents core.VaultEvents) error {
+	for _, event := range vaultEvents {
+		p.knownVaultEvents.Add(event.Hash())
+	}
+
+	log.Debugf("p2p send vault event for %s", p.subnet)
+	return p2p.Send(p.rw, VaultEventMsg, vaultEvents)
 }
 
 // AsyncSendTransactions queues list of transactions propagation to a remote
@@ -235,6 +266,19 @@ func (p *Peer) AsyncSendTransactions(txs types.Transactions) {
 		}
 	default:
 		p.Log().Debug("Dropping transaction propagation", "count", len(txs))
+	}
+}
+
+// AsyncSendVaultEvents queues list of vault events propagation to a remote
+// peer. If the peer's broadcast queue is full, the event is silently dropped.
+func (p *Peer) AsyncSendVaultEvents(vaultEvents core.VaultEvents) {
+	select {
+	case p.queuedVaultEvents <- vaultEvents:
+		for _, event := range vaultEvents {
+			p.knownVaultEvents.Add(event.Hash())
+		}
+	default:
+		p.Log().Debug("Dropping transaction propagation", "count", len(vaultEvents))
 	}
 }
 
@@ -589,6 +633,21 @@ func (ps *PeerSet) PeersWithoutTx(hash common.Hash) []*Peer {
 	list := make([]*Peer, 0, len(ps.peers))
 	for _, p := range ps.peers {
 		if !p.knownTxs.Has(hash) {
+			list = append(list, p)
+		}
+	}
+	return list
+}
+
+// PeersWithoutVaultEvent retrieves a list of peers that do not have a given
+// vault event in their set of known hashes.
+func (ps *PeerSet) PeersWithoutVaultEvent(hash common.Hash) []*Peer {
+	ps.lock.RLock()
+	defer ps.lock.RUnlock()
+
+	list := make([]*Peer, 0, len(ps.peers))
+	for _, p := range ps.peers {
+		if !p.knownBlocks.Has(hash) {
 			list = append(list, p)
 		}
 	}

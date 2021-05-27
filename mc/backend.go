@@ -50,6 +50,7 @@ import (
 	"github.com/MOACChain/xchain/p2p"
 	vnodeParams "github.com/MOACChain/xchain/params"
 	"github.com/MOACChain/xchain/rpc"
+	"github.com/MOACChain/xchain/sentinel"
 	"github.com/MOACChain/xchain/vnode"
 )
 
@@ -86,6 +87,9 @@ type MoacService struct {
 	networkId      uint64
 	netRPCService  *mcapi.PublicNetAPI
 	lock           sync.RWMutex // Protects the variadic fields (e.g. gas price and moacbase)
+
+	//sentinel, monitor events from target chains
+	sentinel *sentinel.Sentinel
 }
 
 func GetInstance() *MoacService {
@@ -166,7 +170,11 @@ func New(ctx *node.ServiceContext, config *Config) (*MoacService, error) {
 		config.TxPool.Journal = ctx.ResolvePath(config.TxPool.Journal)
 	}
 
+	// txpool
 	mcSrv.txPool = core.NewTxPool(config.TxPool, mcSrv.chainConfig, mcSrv.blockchain)
+
+	// sentinel for vault
+	mcSrv.sentinel = sentinel.New(mcSrv.BlockChain())
 
 	log.Debugf("create new protocol manager")
 	if mcSrv.ProtocolManager, err = NewProtocolManager(
@@ -175,6 +183,7 @@ func New(ctx *node.ServiceContext, config *Config) (*MoacService, error) {
 		config.NetworkId,
 		mcSrv.eventMux,
 		mcSrv.txPool,
+		mcSrv.sentinel,
 		mcSrv.engine,
 		mcSrv.blockchain,
 		chainDb,
@@ -388,10 +397,9 @@ func (s *MoacService) StartMining(local bool) error {
 	return nil
 }
 
-func (s *MoacService) StopMining()         { s.miner.Stop() }
-func (s *MoacService) IsMining() bool      { return s.miner.Mining() }
-func (s *MoacService) Miner() *miner.Miner { return s.miner }
-
+func (s *MoacService) StopMining()                        { s.miner.Stop() }
+func (s *MoacService) IsMining() bool                     { return s.miner.Mining() }
+func (s *MoacService) Miner() *miner.Miner                { return s.miner }
 func (s *MoacService) AccountManager() *accounts.Manager  { return s.accountManager }
 func (s *MoacService) BlockChain() *core.BlockChain       { return s.blockchain }
 func (s *MoacService) TxPool() *core.TxPool               { return s.txPool }

@@ -71,6 +71,9 @@ const (
 	ScsMsg = 0x31
 	ScsRes = 0x32
 	ScsReg = 0x33
+
+	// vault event message
+	VaultEventMsg = 0x101
 )
 
 type errCode int

@@ -57,3 +57,18 @@ type ChainSideEvent struct {
 type ChainHeadEvent struct{ Block *types.Block }
 
 type TxShardJoinEvent struct{ Tx *types.Transaction }
+
+type VaultEvents []*VaultEvent
+
+type VaultEvent struct {
+	SourceToken common.Address
+	MappedToken common.Address
+	To          common.Address
+	Amount      uint64
+	Nonce       uint64
+	Data        []byte
+}
+
+func (vaultEvent *VaultEvent) Hash() common.Hash {
+	return common.RlpHash(vaultEvent)
+}
