@@ -56,6 +56,7 @@ const (
 	GetBlockBodiesMsg  = 0x05
 	BlockBodiesMsg     = 0x06
 	NewBlockMsg        = 0x07
+	SigShareMsg        = 0x08
 
 	// Protocol messages belonging to mc/63
 	GetNodeDataMsg = 0x0d
@@ -67,13 +68,13 @@ const (
 	ShardingCreateMsg = 0x21
 	ShardingFlushMsg  = 0x22
 
+	// vault event message
+	VaultEventMsg = 0x23
+
 	//scs message
 	ScsMsg = 0x31
 	ScsRes = 0x32
 	ScsReg = 0x33
-
-	// vault event message
-	VaultEventMsg = 0x101
 )
 
 type errCode int

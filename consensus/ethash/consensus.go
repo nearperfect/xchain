@@ -129,7 +129,9 @@ func (ethash *Ethash) VerifyHeader(chain consensus.ChainReader, header *types.He
 // VerifyHeaders is similar to VerifyHeader, but verifies a batch of headers
 // concurrently. The method returns a quit channel to abort the operations and
 // a results channel to retrieve the async verifications.
-func (ethash *Ethash) VerifyHeaders(chain consensus.ChainReader, headers []*types.Header, seals []bool) (chan<- struct{}, <-chan error) {
+func (ethash *Ethash) VerifyHeaders(
+	chain consensus.ChainReader, headers []*types.Header, seals []bool,
+) (chan<- struct{}, <-chan error) {
 	// If we're running a full engine faking, accept any input as valid
 	if ethash.fakeFull || len(headers) == 0 {
 		abort, results := make(chan struct{}), make(chan error, len(headers))
@@ -330,13 +332,13 @@ func CalcDifficulty(config *params.ChainConfig, time uint64, parent *types.Heade
 
 // Some weird constants to avoid constant memory allocs for them.
 var (
-	expDiffPeriod = big.NewInt(100000)
-	big1          = big.NewInt(1)
-	big2          = big.NewInt(2)
-	big9          = big.NewInt(9)
-	big10         = big.NewInt(10)
-	bigMinus99    = big.NewInt(-99)
-	big2999999    = big.NewInt(2999999)
+	expDiffPeriod     = big.NewInt(100000)
+	big1              = big.NewInt(1)
+	big2              = big.NewInt(2)
+	big10             = big.NewInt(10)
+	bigMinus99        = big.NewInt(-99)
+	big2999999        = big.NewInt(2999999)
+	blockTimeInterval = big.NewInt(4)
 )
 
 // calcDifficultyPangu is the difficulty adjustment algorithm. It returns
@@ -346,7 +348,7 @@ var (
 func calcDifficultyPangu(config *params.ChainConfig, time uint64, parent *types.Header) *big.Int {
 	// algorithm:
 	// diff = (parent_diff +
-	//         (parent_diff / 2048 * max((2 if len(parent.uncles) else 1) - ((timestamp - parent.timestamp) // 9), -99))
+	//         (parent_diff / 2048 * max((2 if len(parent.uncles) else 1) - ((timestamp - parent.timestamp) // blockTimeInterval), -99))
 	//        ) + 2^(periodCount - 2)
 
 	bigTime := new(big.Int).SetUint64(time)
@@ -356,9 +358,9 @@ func calcDifficultyPangu(config *params.ChainConfig, time uint64, parent *types.
 	x := new(big.Int)
 	y := new(big.Int)
 
-	// (2 if len(parent_uncles) else 1) - (block_timestamp - parent_timestamp) // 9
+	// (2 if len(parent_uncles) else 1) - (block_timestamp - parent_timestamp) // blockTimeInterval
 	x.Sub(bigTime, bigParentTime)
-	x.Div(x, big9)
+	x.Div(x, blockTimeInterval)
 	if parent.UncleHash == types.EmptyUncleHash {
 		x.Sub(big1, x)
 	} else {

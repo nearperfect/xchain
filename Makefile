@@ -4,7 +4,7 @@ GOBIN = $(shell pwd)/build/bin
 GO = 1.13.4
 
 xchain:
-	go run build/ci.go install ./cmd/xchain
+	go run build/ci.go install -build-tag bls ./cmd/xchain
 
 	@echo "Done building."
 	@echo "Run \"$(GOBIN)/xchain\" to launch xchain."

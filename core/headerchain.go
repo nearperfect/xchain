@@ -25,13 +25,13 @@ import (
 	mrand "math/rand"
 	"time"
 
-	"github.com/hashicorp/golang-lru"
 	"github.com/MOACChain/MoacLib/common"
 	"github.com/MOACChain/MoacLib/log"
 	"github.com/MOACChain/MoacLib/mcdb"
 	"github.com/MOACChain/MoacLib/params"
 	"github.com/MOACChain/MoacLib/types"
 	"github.com/MOACChain/xchain/consensus"
+	"github.com/hashicorp/golang-lru"
 )
 
 const (

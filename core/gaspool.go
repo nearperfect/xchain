@@ -44,3 +44,7 @@ func (gp *GasPool) SubGas(amount *big.Int) error {
 func (gp *GasPool) String() string {
 	return (*big.Int)(gp).String()
 }
+
+func (gp *GasPool) Value() uint64 {
+	return (*big.Int)(gp).Uint64()
+}

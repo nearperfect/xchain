@@ -275,6 +275,10 @@ func doInstall(cmdline []string) {
 
 func buildFlags(env build.Environment) (flags []string) {
 	var ld []string
+	if env.BuildTag != "" {
+		flags = append(flags, "-tags", env.BuildTag)
+	}
+
 	if env.Commit != "" {
 		ld = append(ld, "-X", "main.gitCommit="+env.Commit)
 	}

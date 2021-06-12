@@ -27,6 +27,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/hashicorp/golang-lru"
+
 	"github.com/MOACChain/MoacLib/common"
 	"github.com/MOACChain/MoacLib/common/mclock"
 	"github.com/MOACChain/MoacLib/crypto"
@@ -41,13 +43,11 @@ import (
 	"github.com/MOACChain/MoacLib/vm"
 	"github.com/MOACChain/xchain/consensus"
 	"github.com/MOACChain/xchain/event"
-	"github.com/hashicorp/golang-lru"
 )
 
 var (
 	blockInsertTimer = metrics.NewTimer("chain/inserts")
-
-	ErrNoGenesis = errors.New("Genesis not found in chain")
+	ErrNoGenesis     = errors.New("Genesis not found in chain")
 )
 
 const (
@@ -78,15 +78,16 @@ const (
 type BlockChain struct {
 	config *params.ChainConfig // chain & network configuration
 
-	hc            *HeaderChain
-	chainDb       mcdb.Database
-	rmLogsFeed    event.Feed
-	chainFeed     event.Feed
-	chainSideFeed event.Feed
-	chainHeadFeed event.Feed
-	logsFeed      event.Feed
-	scope         event.SubscriptionScope
-	genesisBlock  *types.Block
+	hc                *HeaderChain
+	chainDb           mcdb.Database
+	rmLogsFeed        event.Feed
+	chainFeed         event.Feed
+	chainSideFeed     event.Feed
+	chainHeadFeed     event.Feed
+	blockGenTimerFeed event.Feed
+	logsFeed          event.Feed
+	scope             event.SubscriptionScope
+	genesisBlock      *types.Block
 
 	mu      sync.RWMutex // global mutex for locking chain operations
 	chainmu sync.RWMutex // blockchain insertion lock
@@ -148,6 +149,7 @@ func NewBlockChain(chainDb mcdb.Database, config *params.ChainConfig, engine con
 	if err != nil {
 		return nil, err
 	}
+
 	bc.genesisBlock = bc.GetBlockByNumber(0)
 	if bc.genesisBlock == nil {
 		return nil, ErrNoGenesis
@@ -1465,6 +1467,11 @@ func (bc *BlockChain) SubscribeChainEvent(ch chan<- ChainEvent) event.Subscripti
 // SubscribeChainHeadEvent registers a subscription of ChainHeadEvent.
 func (bc *BlockChain) SubscribeChainHeadEvent(ch chan<- ChainHeadEvent) event.Subscription {
 	return bc.scope.Track(bc.chainHeadFeed.Subscribe(ch))
+}
+
+// SubscribeBlockGenTimerEvent registers a subscription of BlockGenTimerEvent.
+func (bc *BlockChain) SubscribeBlockGenTimerEvent(ch chan<- BlockGenTimerEvent) event.Subscription {
+	return bc.scope.Track(bc.blockGenTimerFeed.Subscribe(ch))
 }
 
 // SubscribeChainSideEvent registers a subscription of ChainSideEvent.

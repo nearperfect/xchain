@@ -22,9 +22,9 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/MOACChain/MoacLib/params"
 	"github.com/MOACChain/xchain/p2p"
 	"github.com/MOACChain/xchain/p2p/nat"
-	"github.com/MOACChain/MoacLib/params"
 )
 
 const (
@@ -57,11 +57,11 @@ func DefaultDataDir() string {
 	home := homeDir()
 	if home != "" {
 		if runtime.GOOS == "darwin" {
-			return filepath.Join(home, "Library", "MoacNode")
+			return filepath.Join(home, "Library", "xchain")
 		} else if runtime.GOOS == "windows" {
-			return filepath.Join(home, "AppData", "Roaming", "MoacNode")
+			return filepath.Join(home, "AppData", "Roaming", "xchain")
 		} else {
-			return filepath.Join(home, ".moac")
+			return filepath.Join(home, ".xchain")
 		}
 	}
 	// As we cannot guess a stable location, return empty and handle later

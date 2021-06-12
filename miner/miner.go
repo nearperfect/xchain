@@ -68,11 +68,13 @@ type Miner struct {
 }
 
 func New(mc Backend, config *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, nr NetworkRelay) *Miner {
+	//worker := newWorker(config, engine, common.Address{}, mc, mux, nr),
+	worker := NewWorker(config, engine, common.Address{}, mc, mux, nr)
 	miner := &Miner{
 		mc:       mc,
 		mux:      mux,
 		engine:   engine,
-		worker:   newWorker(config, engine, common.Address{}, mc, mux, nr),
+		worker:   worker,
 		canStart: 1,
 	}
 	miner.Register(NewCpuAgent(mc.BlockChain(), engine))
@@ -126,7 +128,6 @@ func (self *Miner) Start(coinbase common.Address) {
 
 	log.Info("Starting mining operation")
 	self.worker.start()
-	self.worker.commitNewWork()
 }
 
 func (self *Miner) Stop() {

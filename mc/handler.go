@@ -38,6 +38,7 @@ import (
 	ctypes "github.com/MOACChain/MoacLib/types"
 	"github.com/MOACChain/MoacLib/vm"
 	"github.com/MOACChain/xchain/consensus"
+	"github.com/MOACChain/xchain/consensus/pos"
 	"github.com/MOACChain/xchain/core"
 	"github.com/MOACChain/xchain/core/contracts"
 	"github.com/MOACChain/xchain/event"
@@ -119,6 +120,7 @@ type ProtocolManager struct {
 	acceptTxs       uint32 // Flag whether we're considered synchronised (enables transaction processing)
 	txpool          txPool
 	sentinel        *sentinel.Sentinel
+	engine          consensus.Engine
 	blockchain      *core.BlockChain
 	chaindb         mcdb.Database
 	chainconfig     *params.ChainConfig
@@ -136,6 +138,7 @@ type ProtocolManager struct {
 	shardingTxCh    chan core.ShardingTxEvent // chan for sharding chan transactions
 	shardingTxSub   event.Subscription
 	minedBlockSub   *event.TypeMuxSubscription
+	sigShareSub     *event.TypeMuxSubscription
 
 	// channels for fetcher, syncer, txsyncLoop
 	newPeerCh   chan *Peer
@@ -202,6 +205,8 @@ func NewProtocolManager(
 		networkId:         networkId,
 		eventMux:          mux,
 		txpool:            txpool,
+		sentinel:          sentinel,
+		engine:            engine,
 		blockchain:        blockchain,
 		chaindb:           chaindb,
 		chainconfig:       config,
@@ -351,15 +356,17 @@ func (pm *ProtocolManager) removePeer(id string, subnet string) {
 func (pm *ProtocolManager) Start(maxPeers int) {
 	pm.p2pManager.maxPeers = maxPeers
 
-	// broadcast vault events
-	pm.vaultEventCh = make(chan core.VaultEvent, vaultEventChanSize)
-	pm.vaultEventSub = pm.sentinel.SubscribeVaultEvent(pm.vaultEventCh)
 	// broadcast transactions
 	pm.txCh = make(chan core.TxPreEvent, txChanSize)
 	pm.txSub = pm.txpool.SubscribeTxPreEvent(pm.txCh)
+
 	// broadcast sharding transactions
 	pm.shardingTxCh = make(chan core.ShardingTxEvent, shardingTxChanSize)
 	pm.shardingTxSub = pm.txpool.SubscribeShardingTxEvent(pm.shardingTxCh)
+
+	// broadcast vault events
+	pm.vaultEventCh = make(chan core.VaultEvent, vaultEventChanSize)
+	pm.vaultEventSub = pm.sentinel.SubscribeVaultEvent(pm.vaultEventCh)
 
 	// broadcast tx
 	go pm.txBroadcastLoop()
@@ -369,6 +376,7 @@ func (pm *ProtocolManager) Start(maxPeers int) {
 
 	// broadcast mined blocks
 	pm.minedBlockSub = pm.eventMux.Subscribe(core.NewMinedBlockEvent{})
+	pm.sigShareSub = pm.eventMux.Subscribe(core.NewSigShareEvent{})
 	go pm.minedBroadcastLoop()
 
 	// start sync handlers
@@ -399,6 +407,7 @@ func (pm *ProtocolManager) Stop() {
 	pm.txSub.Unsubscribe()         // quits txBroadcastLoop
 	pm.shardingTxSub.Unsubscribe() // quits txBroadcastLoop
 	pm.minedBlockSub.Unsubscribe() // quits blockBroadcastLoop
+	pm.sigShareSub.Unsubscribe()   // quites sigShareBroadcastLoop
 
 	// Quit the sync loop.
 	// After this send has completed, no new peers will be accepted.
@@ -903,11 +912,21 @@ func (pm *ProtocolManager) handleSubnetMsg(p *Peer, msg p2p.Msg) error {
 
 	case msg.Code == VaultEventMsg:
 		log.Infof("  vault event received !!!!!!!!!!!!!!")
+		var vaultEvents []*core.VaultEvent
+		// Parse all vault events
+		if err := msg.Decode(&vaultEvents); err != nil {
+			return ErrResp(ErrDecode, "vault events msg parse error: %v: %v", msg, err)
+		}
+
+		for _, event := range vaultEvents {
+			p.MarkVaultEvent(event.Hash())
+		}
+
 	case msg.Code == TxMsg:
 		var txs, txsShard []*types.Transaction
 		// Transactions can be processed, parse all of them and deliver to the pool
 		if err := msg.Decode(&txs); err != nil {
-			return ErrResp(ErrDecode, "msg %v: %v", msg, err)
+			return ErrResp(ErrDecode, "tx msg parse error %v: %v", msg, err)
 		}
 
 		// Transactions arrived, make sure we have a valid and fresh chain to handle them
@@ -941,6 +960,7 @@ func (pm *ProtocolManager) handleSubnetMsg(p *Peer, msg p2p.Msg) error {
 
 	case msg.Code == ScsReg:
 
+	default:
 	}
 
 	return nil
@@ -1272,6 +1292,33 @@ func (pm *ProtocolManager) handleMainnetMsg(p *Peer, msg p2p.Msg) error {
 		}
 		pm.txpool.AddRemotes(txs)
 
+	case msg.Code == VaultEventMsg:
+		log.Infof("  vault event received !!!!!!!!!!!!!!")
+		var vaultEvents []*core.VaultEvent
+		// Parse all vault events
+		if err := msg.Decode(&vaultEvents); err != nil {
+			return ErrResp(ErrDecode, "vault events msg parse error: %v: %v", msg, err)
+		}
+
+		for _, event := range vaultEvents {
+			pm.sentinel.MarkVaultEvent(event)
+			p.MarkVaultEvent(event.Hash())
+		}
+
+	case msg.Code == SigShareMsg:
+		log.Infof("  sig share received !!!!!!!!!!!!!!")
+		var sigShares []*pos.SigShareMessage
+		// Parse all vault events
+		if err := msg.Decode(&sigShares); err != nil {
+			return ErrResp(ErrDecode, "sig shares msg parse error: %v: %v", msg, err)
+		}
+
+		for _, sigShare := range sigShares {
+			pos := pm.engine.(pos.Pos)
+			pos.Vss.SigShareChan <- sigShare
+			p.MarkSigShare(sigShare.Hash())
+		}
+
 	case msg.Code == ScsMsg:
 		var scsMsg pb.ScsPushMsg
 		// msg.payload is a ScsPushMsg
@@ -1299,6 +1346,19 @@ func (pm *ProtocolManager) handleMainnetMsg(p *Peer, msg p2p.Msg) error {
 	}
 
 	return nil
+}
+
+// BroadcastBlock will either propagate a block to a subset of it's peers, or
+// will only announce it's availability (depending what's requested).
+func (pm *ProtocolManager) BroadcastSigShare(sigShare *pos.SigShareMessage) {
+	hash := sigShare.Hash()
+	peerSet := pm.p2pManager.peerSet
+	peers := peerSet.PeersWithoutSigShare(hash)
+
+	// broadcast to peers
+	for _, peer := range peers {
+		peer.AsyncSendSigShares(core.SigShares{sigShare})
+	}
 }
 
 // BroadcastBlock will either propagate a block to a subset of it's peers, or
@@ -1372,7 +1432,6 @@ func (pm *ProtocolManager) BroadcastTx(tx *types.Transaction) {
 }
 
 func (pm *ProtocolManager) BroadcastVaultEvent(vaultEvent *core.VaultEvent) {
-	log.Debugf("Vault event: %s", vaultEvent)
 	peerSet := pm.p2pManager.peerSet
 	if peerSet == nil {
 		return
@@ -1398,14 +1457,26 @@ func (pm *ProtocolManager) BroadcastPushMsgToPeerSet(msg *pb.ScsPushMsg, peerSet
 	log.Debugf("!!!  peer SendScsMsg Requestid: %s, peerNum: %d", string(msg.Requestid), len(peers))
 }
 
+// SigShare msg broadcast loop
+func (pm *ProtocolManager) sigShareBroadcastLoop() {
+	// automatically stops if unsubscribe
+	for obj := range pm.sigShareSub.Chan() {
+		switch ev := obj.Data.(type) {
+		case core.NewSigShareEvent:
+			// propagate block to peers
+			pm.BroadcastSigShare(ev.SigShare)
+		}
+	}
+}
+
 // Mined broadcast loop
 func (pm *ProtocolManager) minedBroadcastLoop() {
 	// automatically stops if unsubscribe
 	for obj := range pm.minedBlockSub.Chan() {
 		switch ev := obj.Data.(type) {
 		case core.NewMinedBlockEvent:
-			pm.BroadcastBlock(ev.Block, true)  // First propagate block to peers
-			pm.BroadcastBlock(ev.Block, false) // Only then announce to the rest
+			// propagate block to peers
+			pm.BroadcastBlock(ev.Block, true)
 		}
 	}
 }

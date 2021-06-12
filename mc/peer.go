@@ -47,10 +47,12 @@ const (
 	maxKnownTxs         = 32768   // Maximum transactions hashes to keep in the known list (prevent DOS)
 	maxKnownBlocks      = 1024    // Maximum block hashes to keep in the known list (prevent DOS)
 	maxKnownVaultEvents = 32768   // Maximum transactions hashes to keep in the known list (prevent DOS)
+	maxKnownSigShares   = 32768   // Maximum transactions hashes to keep in the known list (prevent DOS)
 	handshakeTimeout    = 5 * time.Second
 
 	maxQueuedTxs         = 512  // maxQueuedTxs is the maximum number of transaction lists to queue up
-	maxQueuedVaultEvents = 512  // maxQueuedVaultEvents is the maximum number of vault events lists to queue up
+	maxQueuedVaultEvents = 2048 // maxQueuedVaultEvents is the max number of vault events lists to queue up
+	maxQueuedSigShares   = 2048 // maxQueuedVaultEvents is the max number of sig shares lists to queue up
 	maxQueuedProps       = 8    // maxQueuedProps is the maximum number of block propagations to queue up
 	maxQueuedAnns        = 8    // maxQueuedAnns is the maximum number of block announcements to queue up
 	maxQueuedMsgs        = 1000 // maxQueuedProps is the maximum number of scs msgs to queue up
@@ -86,8 +88,10 @@ type Peer struct {
 	knownBlocks       *set.Set                // Set of block hashes known to be known by this Peer
 	knownMsgs         *set.Set                // Set of msg request ids known to be sent to the Peer
 	knownVaultEvents  *set.Set                // Set of vault event hashes known to be known by this Peer
+	knownSigShares    *set.Set                // Set of sigShare hashes known to be known by this Peer
 	queuedTxs         chan types.Transactions // Queue of transactions to broadcast to the peer
 	queuedVaultEvents chan core.VaultEvents   // Queue of vault events to broadcast to the peer
+	queuedSigShares   chan core.SigShares     // Queue of sig shares to broadcast to the peer
 	queuedProps       chan *propEvent         // Queue of blocks to broadcast to the peer
 	queuedAnns        chan *types.Block       // Queue of blocks to announce to the peer
 	queuedMsgs        chan *pb.ScsPushMsg     // Queue of scs msgs to broadcast to the peer
@@ -99,21 +103,23 @@ func newPeer(version int, p *p2p.Peer, rw p2p.MsgReadWriter) *Peer {
 	id := p.ID()
 
 	return &Peer{
-		Peer:             p,
-		rw:               rw,
-		version:          version,
-		id:               fmt.Sprintf("%x", id[:8]),
-		knownTxs:         set.New(),
-		knownBlocks:      set.New(),
-		knownMsgs:        set.New(),
-		knownVaultEvents: set.New(),
-		queuedTxs:        make(chan types.Transactions, maxQueuedTxs),
-		queuedProps:      make(chan *propEvent, maxQueuedProps),
-		queuedAnns:       make(chan *types.Block, maxQueuedAnns),
-		queuedMsgs:       make(chan *pb.ScsPushMsg, maxQueuedMsgs),
-		queuedRes:        make(chan *pb.ScsPushMsg, maxQueuedRes),
-		term:             make(chan struct{}),
-		subnet:           p.Subnet(),
+		Peer:              p,
+		rw:                rw,
+		version:           version,
+		id:                fmt.Sprintf("%x", id[:8]),
+		knownTxs:          set.New(),
+		knownBlocks:       set.New(),
+		knownMsgs:         set.New(),
+		knownVaultEvents:  set.New(),
+		queuedTxs:         make(chan types.Transactions, maxQueuedTxs),
+		queuedVaultEvents: make(chan core.VaultEvents, maxQueuedVaultEvents),
+		queuedSigShares:   make(chan core.SigShares, maxQueuedSigShares),
+		queuedProps:       make(chan *propEvent, maxQueuedProps),
+		queuedAnns:        make(chan *types.Block, maxQueuedAnns),
+		queuedMsgs:        make(chan *pb.ScsPushMsg, maxQueuedMsgs),
+		queuedRes:         make(chan *pb.ScsPushMsg, maxQueuedRes),
+		term:              make(chan struct{}),
+		subnet:            p.Subnet(),
 	}
 }
 
@@ -123,6 +129,10 @@ func newPeer(version int, p *p2p.Peer, rw p2p.MsgReadWriter) *Peer {
 func (p *Peer) broadcastloop() {
 	for {
 		select {
+		case sigShares := <-p.queuedSigShares:
+			if err := p.SendSigShares(sigShares); err != nil {
+				return
+			}
 		case vaultEvents := <-p.queuedVaultEvents:
 			if err := p.SendVaultEvents(vaultEvents); err != nil {
 				return
@@ -224,7 +234,17 @@ func (p *Peer) MarkTransaction(hash common.Hash) {
 	p.knownTxs.Add(hash)
 }
 
-// MarkTransaction marks a transaction as known for the Peer, ensuring that it
+// MarkSigShare marks a sig share as known for the Peer, ensuring that it
+// will never be propagated to this particular Peer.
+func (p *Peer) MarkSigShare(hash common.Hash) {
+	// If we reached the memory allowance, drop a previously known sig share hash
+	for p.knownSigShares.Size() >= maxKnownSigShares {
+		p.knownSigShares.Pop()
+	}
+	p.knownSigShares.Add(hash)
+}
+
+// MarkVaultEvent marks a vault event as known for the Peer, ensuring that it
 // will never be propagated to this particular Peer.
 func (p *Peer) MarkVaultEvent(hash common.Hash) {
 	// If we reached the memory allowance, drop a previously known vault event hash
@@ -243,6 +263,17 @@ func (p *Peer) SendTransactions(txs types.Transactions) error {
 
 	log.Debugf("p2p send txmsg for %s", p.subnet)
 	return p2p.Send(p.rw, TxMsg, txs)
+}
+
+// SendSigShares sends sig shares to the Peer and includes the hashes
+// in its sig shares hash set for future reference.
+func (p *Peer) SendSigShares(sigShares core.SigShares) error {
+	for _, sigShare := range sigShares {
+		p.knownSigShares.Add(sigShare.Hash())
+	}
+
+	log.Debugf("p2p send sig share for %s", p.subnet)
+	return p2p.Send(p.rw, SigShareMsg, sigShares)
 }
 
 // SendVaultEvents sends vault events to the Peer and includes the hashes
@@ -278,7 +309,20 @@ func (p *Peer) AsyncSendVaultEvents(vaultEvents core.VaultEvents) {
 			p.knownVaultEvents.Add(event.Hash())
 		}
 	default:
-		p.Log().Debug("Dropping transaction propagation", "count", len(vaultEvents))
+		p.Log().Debug("Dropping vault events propagation", "count", len(vaultEvents))
+	}
+}
+
+// AsyncSendSigShares queues list of sigShares propagation to a remote
+// peer. If the peer's broadcast queue is full, the event is silently dropped.
+func (p *Peer) AsyncSendSigShares(sigShares core.SigShares) {
+	select {
+	case p.queuedSigShares <- sigShares:
+		for _, sigShare := range sigShares {
+			p.knownSigShares.Add(sigShare.Hash())
+		}
+	default:
+		p.Log().Debug("Dropping sig share propagation", "count", len(sigShares))
 	}
 }
 
@@ -647,7 +691,22 @@ func (ps *PeerSet) PeersWithoutVaultEvent(hash common.Hash) []*Peer {
 
 	list := make([]*Peer, 0, len(ps.peers))
 	for _, p := range ps.peers {
-		if !p.knownBlocks.Has(hash) {
+		if !p.knownVaultEvents.Has(hash) {
+			list = append(list, p)
+		}
+	}
+	return list
+}
+
+// PeersWithoutSigShare retrieves a list of peers that do not have a given
+// sigShare msg in their set of known hashes.
+func (ps *PeerSet) PeersWithoutSigShare(hash common.Hash) []*Peer {
+	ps.lock.RLock()
+	defer ps.lock.RUnlock()
+
+	list := make([]*Peer, 0, len(ps.peers))
+	for _, p := range ps.peers {
+		if !p.knownSigShares.Has(hash) {
 			list = append(list, p)
 		}
 	}

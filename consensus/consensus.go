@@ -19,9 +19,9 @@ package consensus
 
 import (
 	"github.com/MOACChain/MoacLib/common"
+	"github.com/MOACChain/MoacLib/params"
 	"github.com/MOACChain/MoacLib/state"
 	"github.com/MOACChain/MoacLib/types"
-	"github.com/MOACChain/MoacLib/params"
 	"github.com/MOACChain/xchain/rpc"
 )
 
@@ -63,7 +63,9 @@ type Engine interface {
 	// concurrently. The method returns a quit channel to abort the operations and
 	// a results channel to retrieve the async verifications (the order is that of
 	// the input slice).
-	VerifyHeaders(chain ChainReader, headers []*types.Header, seals []bool) (chan<- struct{}, <-chan error)
+	VerifyHeaders(
+		chain ChainReader, headers []*types.Header, seals []bool,
+	) (chan<- struct{}, <-chan error)
 
 	// VerifyUncles verifies that the given block's uncles conform to the consensus
 	// rules of a given engine.

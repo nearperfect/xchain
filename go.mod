@@ -14,6 +14,7 @@ require (
 	github.com/golang/protobuf v1.3.5
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/huin/goupnp v1.0.0
+	github.com/innowells/bls_lib/v2 v2.0.1
 	github.com/jackpal/go-nat-pmp v1.0.2
 	github.com/karalabe/hid v1.0.0
 	github.com/kylelemons/godebug v1.1.0 // indirect
@@ -34,8 +35,10 @@ require (
 	github.com/rs/cors v1.7.0
 	github.com/stretchr/testify v1.7.0 // indirect
 	github.com/syndtr/goleveldb v1.0.0
+	go.dedis.ch/kyber/v3 v3.0.13
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
 	golang.org/x/net v0.0.0-20210510120150-4163338589ed
+	golang.org/x/sys v0.0.0-20210611083646-a4fc73990273 // indirect
 	golang.org/x/tools v0.1.1
 	google.golang.org/grpc v1.25.1
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
@@ -47,3 +50,5 @@ require (
 	gopkg.in/urfave/cli.v1 v1.20.0
 	gotest.tools/v3 v3.0.3 // indirect
 )
+
+replace github.com/MOACChain/MoacLib => /media/yifan/ssd/go/src/github.com/MOACChain/MoacLib

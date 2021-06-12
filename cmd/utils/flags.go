@@ -292,7 +292,11 @@ var (
 		Usage: "Password file to use for non-inteactive password input",
 		Value: "",
 	}
-
+	XchainPasswordFlag = cli.StringFlag{
+		Name:  "xchainpassword",
+		Usage: "Password for xchain node keystore",
+		Value: "",
+	}
 	VMEnableDebugFlag = cli.BoolFlag{
 		Name:  "vmdebug",
 		Usage: "Record information useful for VM and contract debugging",
@@ -688,6 +692,20 @@ func MakeAddress(ks *keystore.KeyStore, account string) (accounts.Account, error
 	return accs[index], nil
 }
 
+func setXchainBase(ctx *cli.Context, cfg *mc.Config) {
+	datadir := MakeDataDir(ctx)
+	passphrace := "xchaindefaultphrace"
+	if ctx.GlobalIsSet(XchainPasswordFlag.Name) {
+		passphrace = XchainPasswordFlag.Name
+		keystore.SavePassphrace(passphrace)
+	}
+	keystore.SetBasePath(datadir)
+	ks, _ := keystore.GetOrCreateKeyStore()
+	log.Infof("ks %v, cfg: %v", ks, cfg)
+	cfg.XchainId = ks.Address
+	panic(0)
+}
+
 // setMoacbase retrieves the moacbase either from the directly specified
 // command line flags or from the keystore if CLI indexed.
 func setMoacbase(ctx *cli.Context, ks *keystore.KeyStore, cfg *mc.Config) {
@@ -799,6 +817,8 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 		if !ctx.GlobalIsSet(NetworkIdFlag.Name) {
 			cfg.P2P.NetworkId = params.TestNetworkId
 		}
+	default:
+		cfg.DataDir = node.DefaultDataDir()
 	}
 
 	if ctx.GlobalIsSet(KeyStoreDirFlag.Name) {
@@ -895,6 +915,7 @@ func SetMoacConfig(ctx *cli.Context, n *node.Node, cfg *mc.Config) {
 
 	ks := n.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
 	setMoacbase(ctx, ks, cfg)
+	setXchainBase(ctx, cfg)
 	setGPO(ctx, &cfg.GPO)
 	setTxPool(ctx, &cfg.TxPool)
 	setEthash(ctx, cfg)
@@ -958,10 +979,12 @@ func SetMoacConfig(ctx *cli.Context, n *node.Node, cfg *mc.Config) {
 func RegisterMoacService(n *node.Node, cfg *mc.Config) {
 	var err error
 	log.Debugf("Register %v", cfg)
-	err = n.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		fullNode, err := mc.New(ctx, cfg)
-		return fullNode, err
-	})
+	err = n.Register(
+		func(ctx *node.ServiceContext) (node.Service, error) {
+			fullNode, err := mc.New(ctx, cfg)
+			return fullNode, err
+		},
+	)
 
 	if err != nil {
 		Fatalf("Failed to register the MoacNode service: %v", err)

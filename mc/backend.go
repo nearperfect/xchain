@@ -38,6 +38,7 @@ import (
 	"github.com/MOACChain/xchain/accounts"
 	"github.com/MOACChain/xchain/consensus"
 	"github.com/MOACChain/xchain/consensus/ethash"
+	"github.com/MOACChain/xchain/consensus/pos"
 	"github.com/MOACChain/xchain/core"
 	"github.com/MOACChain/xchain/core/bloombits"
 	"github.com/MOACChain/xchain/event"
@@ -175,6 +176,7 @@ func New(ctx *node.ServiceContext, config *Config) (*MoacService, error) {
 
 	// sentinel for vault
 	mcSrv.sentinel = sentinel.New(mcSrv.BlockChain())
+	log.Infof("sentinel ********** %v", mcSrv.sentinel)
 
 	log.Debugf("create new protocol manager")
 	if mcSrv.ProtocolManager, err = NewProtocolManager(
@@ -191,6 +193,8 @@ func New(ctx *node.ServiceContext, config *Config) (*MoacService, error) {
 		return nil, err
 	}
 
+	log.Infof("sentinel ----------- %v", mcSrv.ProtocolManager.sentinel)
+
 	mcSrv.miner = miner.New(mcSrv, mcSrv.chainConfig, mcSrv.EventMux(), mcSrv.engine, mcSrv.ProtocolManager.NetworkRelay)
 	mcSrv.miner.SetExtra(makeExtraData(config.ExtraData))
 
@@ -204,7 +208,11 @@ func New(ctx *node.ServiceContext, config *Config) (*MoacService, error) {
 	//Set the instance with the current MOAC NODE
 	Instance = mcSrv
 
-	log.Infof("******Current Block %v, isNuwa %v", mcSrv.blockchain.CurrentBlock().Number(), chainConfig.IsNuwa(mcSrv.blockchain.CurrentBlock().Number()))
+	log.Infof(
+		"******Current Block %v, isNuwa %v",
+		mcSrv.blockchain.CurrentBlock().Number(),
+		chainConfig.IsNuwa(mcSrv.blockchain.CurrentBlock().Number()),
+	)
 
 	return mcSrv, nil
 }
@@ -275,10 +283,13 @@ func CreateConsensusEngine(ctx *node.ServiceContext, config *Config, chainConfig
 		log.Warn("Ethash used in shared mode")
 		return ethash.NewShared()
 	default:
-		engine := ethash.New(ctx.ResolvePath(config.EthashCacheDir), config.EthashCachesInMem, config.EthashCachesOnDisk,
-			config.EthashDatasetDir, config.EthashDatasetsInMem, config.EthashDatasetsOnDisk)
-		engine.SetThreads(-1) // Disable CPU mining
-		return engine
+		/*
+					engine := ethash.New(ctx.ResolvePath(config.EthashCacheDir), config.EthashCachesInMem, config.EthashCachesOnDisk,
+						config.EthashDatasetDir, config.EthashDatasetsInMem, config.EthashDatasetsOnDisk)
+					engine.SetThreads(-1) // Disable CPU mining
+		            return engine
+		*/
+		return pos.New()
 	}
 }
 

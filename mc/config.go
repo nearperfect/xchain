@@ -117,6 +117,9 @@ type Config struct {
 	PowFake   bool   `toml:"-"`
 	PowTest   bool   `toml:"-"`
 	PowShared bool   `toml:"-"`
+
+	// vss
+	XchainId common.Address
 }
 
 type configMarshaling struct {

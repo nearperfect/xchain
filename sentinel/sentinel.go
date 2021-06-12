@@ -35,13 +35,31 @@ type Sentinel struct {
 	scope          event.SubscriptionScope
 	chainHeadCh    chan core.ChainHeadEvent
 	chainHeadSub   event.Subscription
+
+	// vault events
+	VaultEventsReceived  map[common.Hash]int
+	VaultEvents          map[common.Hash]*core.VaultEvent
+	VaultEventsNonce     map[TokenMapping]map[*big.Int]*core.VaultEvent
+	VaultEventsWatermark map[TokenMapping]*big.Int
+}
+
+type TokenMapping struct {
+	SourceAddress common.Address
+	SourceChainid *big.Int
+	MappedAddress common.Address
+	MappedChainid *big.Int
 }
 
 func New(bc *core.BlockChain) *Sentinel {
 	sentinel := &Sentinel{
-		chainHeadCh: make(chan core.ChainHeadEvent, 10),
+		chainHeadCh:          make(chan core.ChainHeadEvent, 10),
+		VaultEvents:          make(map[common.Hash]*core.VaultEvent),
+		VaultEventsReceived:  make(map[common.Hash]int),
+		VaultEventsNonce:     make(map[TokenMapping]map[*big.Int]*core.VaultEvent),
+		VaultEventsWatermark: make(map[TokenMapping]*big.Int),
 	}
-	//sentinel.chainHeadSub = bc.SubscribeChainHeadEvent(sentinel.chainHeadCh)
+	sentinel.scope.Open()
+	sentinel.chainHeadSub = bc.SubscribeChainHeadEvent(sentinel.chainHeadCh)
 	go sentinel.start()
 
 	return sentinel
@@ -51,11 +69,42 @@ func (sentinel *Sentinel) SubscribeVaultEvent(ch chan<- core.VaultEvent) event.S
 	return sentinel.scope.Track(sentinel.vaultEventFeed.Subscribe(ch))
 }
 
+func (sentinel *Sentinel) PrintVaultEventsReceived() {
+	for hash, received := range sentinel.VaultEventsReceived {
+		log.Infof("Vault events received:")
+		log.Infof("\t%x, %d", hash.Bytes(), received)
+	}
+}
+
+func (sentinel *Sentinel) MarkVaultEvent(vaultEvent *core.VaultEvent) {
+	sentinel.VaultEventsReceived[vaultEvent.Hash()] += 1
+	sentinel.VaultEvents[vaultEvent.Hash()] = vaultEvent
+
+	// update VaultEventsNonce
+	nonce := vaultEvent.Nonce
+	tokenMapping := TokenMapping{
+		vaultEvent.SourceToken,
+		vaultEvent.SourceChainid,
+		vaultEvent.MappedToken,
+		vaultEvent.MappedChainid,
+	}
+	if nonceMapping, found := sentinel.VaultEventsNonce[tokenMapping]; found {
+		nonceMapping[nonce] = vaultEvent
+	} else {
+		sentinel.VaultEventsNonce[tokenMapping] = make(map[*big.Int]*core.VaultEvent)
+		sentinel.VaultEventsNonce[tokenMapping][nonce] = vaultEvent
+	}
+
+	// update water mark
+	sentinel.VaultEventsWatermark[tokenMapping] = nonce
+}
+
 func (sentinel *Sentinel) start() {
 	lastBlock := uint64(0)
 	for {
 		time.Sleep(10 * time.Second)
 		log.Infof("This is sentinel: [[      ***  %d  ***      ]]", lastBlock)
+		sentinel.PrintVaultEventsReceived()
 
 		// init rpc client
 		client, err := mcclient.Dial("http://172.21.0.11:8545")
@@ -75,6 +124,7 @@ func (sentinel *Sentinel) start() {
 			Start:   lastBlock,
 			End:     &currentBlock,
 		}
+		log.Infof("sentinel: start %d, end: %d", lastBlock, currentBlock)
 		itr, err := vaultx.FilterTokenDeposit(
 			filterOpts,
 			[]common.Address{},
@@ -83,25 +133,22 @@ func (sentinel *Sentinel) start() {
 		)
 		for itr.Next() {
 			event := itr.Event
-			log.Infof("vault event 1 %x, %x, %x, %s, %d",
-				event.SourceToken.Bytes(),
-				event.MappedToken.Bytes(),
-				event.From.Bytes(),
-				event.Amount,
-				event.DepositNonce.Uint64(),
-			)
-
 			vaultEvent := core.VaultEvent{
+				event.SourceChainid,
 				event.SourceToken,
+				event.MappedChainid,
 				event.MappedToken,
 				event.From,
-				event.Amount.Uint64(),
-				event.DepositNonce.Uint64(),
+				event.Amount,
+				event.DepositNonce,
 				[]byte{},
 			}
-			log.Infof("vault event 2 %v", vaultEvent)
 
-			go sentinel.vaultEventFeed.Send(vaultEvent)
+			// record state in sentinel, include this node itself.
+			sentinel.MarkVaultEvent(&vaultEvent)
+
+			// broad cast to other nodes
+			sentinel.vaultEventFeed.Send(vaultEvent)
 		}
 
 		lastBlock = currentBlock

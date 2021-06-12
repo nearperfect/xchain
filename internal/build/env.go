@@ -31,6 +31,7 @@ var (
 	BuildnumFlag    = flag.String("buildnum", "", `Overrides CI build number`)
 	PullRequestFlag = flag.Bool("pull-request", false, `Overrides pull request status of the build`)
 	CronJobFlag     = flag.Bool("cron-job", false, `Overrides cron job status of the build`)
+	BuildTagFlag    = flag.String("build-tag", "", `Overrides go build tags`)
 )
 
 // Environment contains metadata provided by the build environment.
@@ -41,6 +42,7 @@ type Environment struct {
 	Buildnum            string
 	IsPullRequest       bool
 	IsCronJob           bool
+	BuildTag            string // build tag for conditional build
 }
 
 func (env Environment) String() string {
@@ -117,6 +119,9 @@ func applyEnvFlags(env Environment) Environment {
 	}
 	if *GitTagFlag != "" {
 		env.Tag = *GitTagFlag
+	}
+	if *BuildTagFlag != "" {
+		env.BuildTag = *BuildTagFlag
 	}
 	if *BuildnumFlag != "" {
 		env.Buildnum = *BuildnumFlag
