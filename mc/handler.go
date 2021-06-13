@@ -17,7 +17,6 @@
 package mc
 
 import (
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,21 +34,16 @@ import (
 	pb "github.com/MOACChain/MoacLib/proto"
 	"github.com/MOACChain/MoacLib/rlp"
 	"github.com/MOACChain/MoacLib/types"
-	ctypes "github.com/MOACChain/MoacLib/types"
-	"github.com/MOACChain/MoacLib/vm"
 	"github.com/MOACChain/xchain/consensus"
 	"github.com/MOACChain/xchain/consensus/pos"
 	"github.com/MOACChain/xchain/core"
-	"github.com/MOACChain/xchain/core/contracts"
 	"github.com/MOACChain/xchain/event"
 	"github.com/MOACChain/xchain/mc/downloader"
 	"github.com/MOACChain/xchain/mc/fetcher"
-	nr "github.com/MOACChain/xchain/networkrelay"
 	"github.com/MOACChain/xchain/node"
 	"github.com/MOACChain/xchain/p2p"
 	"github.com/MOACChain/xchain/p2p/discover"
 	"github.com/MOACChain/xchain/sentinel"
-	"github.com/MOACChain/xchain/vnode"
 	gocache "github.com/patrickmn/go-cache"
 )
 
@@ -127,7 +121,6 @@ type ProtocolManager struct {
 	subnetsConfigdb mcdb.Database
 	subnetsConfig   map[string]SubnetConfig
 	downloader      *downloader.Downloader
-	NetworkRelay    *nr.NetworkRelay
 	fetcher         *fetcher.Fetcher
 	SubProtocols    []p2p.Protocol
 	eventMux        *event.TypeMux
@@ -198,7 +191,6 @@ func NewProtocolManager(
 	engine consensus.Engine,
 	blockchain *core.BlockChain,
 	chaindb mcdb.Database,
-	scsHandler *vnode.VnodeServer,
 ) (*ProtocolManager, error) {
 	// Create the protocol manager with the base fields
 	manager := &ProtocolManager{
@@ -306,18 +298,6 @@ func NewProtocolManager(
 		return manager.blockchain.InsertChain(blocks, liveFlag)
 	}
 	manager.fetcher = fetcher.New(blockchain.GetBlockByHash, validator, manager.BroadcastBlock, heighter, inserter, manager.removePeer)
-
-	manager.NetworkRelay = nr.NewNetworkRelay(
-		manager.scsMsgChan,
-		manager.scsResChan,
-		manager.scsMsgChanMainnet,
-		manager.scsResChanMainnet,
-		scsHandler,
-		blockchain.ChainId().Uint64(),
-	)
-
-	//Add scs Servers to NetworkRelay
-	core.Nr = manager.NetworkRelay
 
 	return manager, nil
 }
@@ -690,88 +670,8 @@ func (pm *ProtocolManager) maybeStartSubnetP2PServer(subnetid string) {
 	}
 }
 
-func (pm *ProtocolManager) getContractParam(contractAddress common.Address, data []byte) []byte {
-	nr := pm.NetworkRelay
-	st, _ := pm.blockchain.State()
-	if codeHash := st.GetCodeHash(contractAddress); codeHash == (common.Hash{}) {
-		return []byte{}
-	}
-	to := common.Address{}
-	to.SetString("")
-	from := common.Address{}
-	viaaddress := common.Address{}
-	viaaddress.SetString(params.VnodeBeneficialAddress)
-	msgHash := common.Hash{}
-	msgHash.SetString("")
-	msg := ctypes.NewMessage(
-		from,
-		&to,
-		0,
-		big.NewInt(0),
-		big.NewInt(0),
-		big.NewInt(0),
-		[]byte{},
-		false,
-		false,
-		false,
-		big.NewInt(0),
-		0,
-		&viaaddress,
-		&msgHash,
-	)
-	context := core.NewEVMContext(msg, pm.blockchain.CurrentBlock().Header(), pm.blockchain, nil, nil)
-	evm := vm.NewEVM(context, st, params.AllProtocolChanges,
-		vm.Config{EnableJit: false, ForceJit: false}, nr)
-	contractRef := vm.AccountRef(contractAddress)
-	precompiledContracts := contracts.GetInstance()
-	ret, leftGas, err := evm.Call(
-		contractRef,
-		contractAddress,
-		data,
-		params.GenesisGasLimit.Uint64(),
-		big.NewInt(0),
-		false,
-		uint64(0),
-		precompiledContracts,
-		msg.GetMsgHash(),
-	)
-	log.Debugf(" %v, %v, %v", ret, leftGas, err)
-
-	return ret
-}
-
 func (pm *ProtocolManager) isSubnetP2PEnabled(contractAddress common.Address, where string) bool {
-	// check vnode local setting first
-	subnetid := strings.ToLower(contractAddress.String())
-	currentBlockNumber := pm.blockchain.CurrentHeader().Number.Uint64()
-	subnetConfig, found := pm.subnetsConfig[subnetid]
-	subnetOnBlockNumber := subnetConfig.BlockStart
-	subnetOffBlockNumber := subnetConfig.BlockEnd
-	// check if current block number is in the active range of subnet server
-	if found && subnetOnBlockNumber <= currentBlockNumber && currentBlockNumber < subnetOffBlockNumber {
-		log.Debugf("subnet isSubnetP2PEnabled %s: %t in [%s] %d / %d / %d", subnetid, true, where, subnetOnBlockNumber, currentBlockNumber, subnetOffBlockNumber)
-		return true
-	}
-
-	// check subchainbase setting
-	key := fmt.Sprintf("isSubnetP2PEnabled:%s:%d", contractAddress.String(), currentBlockNumber)
-	var ret = false
-	if value, found := isSubnetP2PEnabledContractSettingCache.Get(key); !found {
-		data := common.FromHex(isSubnetP2PEnabledHex)
-		_ret := pm.getContractParam(contractAddress, data)
-		_ret_int := 0
-		if len(_ret) > 8 {
-			_ret_int = int(binary.BigEndian.Uint32(_ret[(len(_ret) - 4):]))
-		}
-		ret = _ret_int != 0
-		isSubnetP2PEnabledContractSettingCache.Set(key, ret, gocache.DefaultExpiration)
-	} else {
-		ret = value.(bool)
-	}
-
-	log.Debugf("subnet isSubnetP2PEnabled %s, %t in [%s] %d / %d / %d", key, ret, where, subnetOnBlockNumber, currentBlockNumber, subnetOffBlockNumber)
-
-	return ret
+	return false
 }
 
 func (pm *ProtocolManager) removeZombieSubnetsLoop() {
@@ -902,13 +802,15 @@ func (pm *ProtocolManager) handleSubnetMsg(p *Peer, msg p2p.Msg) error {
 		// broadcastmsg will
 		// 1) forward msg to other vnode (end up in shardingBroadcastLoop())
 		// 2) forward msg to local scs
-		forceToMainnet := false
-		subnetid := fmt.Sprintf("0x%s", common.Bytes2Hex(scsMsg.Subchainid)[2:])
-		contractAddress := common.HexToAddress(subnetid)
-		if !pm.isSubnetP2PEnabled(contractAddress, "handleSubnetMsg") {
-			forceToMainnet = true
-		}
-		pm.NetworkRelay.BroadcastMsg(&scsMsg, forceToMainnet)
+		/*
+			forceToMainnet := false
+			subnetid := fmt.Sprintf("0x%s", common.Bytes2Hex(scsMsg.Subchainid)[2:])
+			contractAddress := common.HexToAddress(subnetid)
+			if !pm.isSubnetP2PEnabled(contractAddress, "handleSubnetMsg") {
+				forceToMainnet = true
+			}
+			pm.NetworkRelay.BroadcastMsg(&scsMsg, forceToMainnet)
+		*/
 
 	case msg.Code == VaultEventMsg:
 		log.Infof("  vault event received !!!!!!!!!!!!!!")
@@ -1216,7 +1118,7 @@ func (pm *ProtocolManager) handleMainnetMsg(p *Peer, msg p2p.Msg) error {
 		}
 		// Mark the hashes as present at the remote node
 		for _, block := range announces {
-			pm.NetworkRelay.SetBlockNumber(block.Number)
+			//pm.NetworkRelay.SetBlockNumber(block.Number)
 			p.MarkBlock(block.Hash)
 		}
 		// Schedule all the unknown hashes for retrieval
@@ -1331,7 +1233,7 @@ func (pm *ProtocolManager) handleMainnetMsg(p *Peer, msg p2p.Msg) error {
 		// broadcastmsg will
 		// 1) forward msg to other vnode (end up in shardingBroadcastLoop())
 		// 2) forward msg to local scs
-		pm.NetworkRelay.BroadcastMsg(&scsMsg, true)
+		//pm.NetworkRelay.BroadcastMsg(&scsMsg, true)
 
 	case msg.Code == ShardingCreateMsg:
 

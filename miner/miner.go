@@ -19,14 +19,12 @@ package miner
 
 import (
 	"fmt"
-	"math/big"
 	"sync/atomic"
 
 	"github.com/MOACChain/MoacLib/common"
 	"github.com/MOACChain/MoacLib/log"
 	"github.com/MOACChain/MoacLib/mcdb"
 	"github.com/MOACChain/MoacLib/params"
-	pb "github.com/MOACChain/MoacLib/proto"
 	"github.com/MOACChain/MoacLib/state"
 	"github.com/MOACChain/MoacLib/types"
 	"github.com/MOACChain/xchain/accounts"
@@ -44,17 +42,6 @@ type Backend interface {
 	ChainDb() mcdb.Database
 }
 
-type NetworkRelay interface {
-	BroadcastRes(msg *pb.ScsPushMsg, forceMainnet bool)
-	BroadcastMsg(msg *pb.ScsPushMsg, forceMainnet bool)
-	OnReceiveMsg(msg *pb.ScsPushMsg)
-	OnReceiveRes(res *pb.ScsPushMsg)
-	OnReceiveRegisterMsg(msg *pb.ScsPushMsg)
-	VnodePushMsg(conReq *pb.ScsPushMsg) (map[int]*pb.ScsPushMsg, error)
-	NotifyScs(address common.Address, msg []byte, hash common.Hash, block *big.Int)
-	UpdateWhiteState(block uint64)
-}
-
 // Miner creates blocks and searches for proof-of-work values.
 type Miner struct {
 	mux         *event.TypeMux
@@ -67,9 +54,8 @@ type Miner struct {
 	shouldStart int32 // should start indicates whether we should start after sync
 }
 
-func New(mc Backend, config *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, nr NetworkRelay) *Miner {
-	//worker := newWorker(config, engine, common.Address{}, mc, mux, nr),
-	worker := NewWorker(config, engine, common.Address{}, mc, mux, nr)
+func New(mc Backend, config *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine) *Miner {
+	worker := NewWorker(config, engine, common.Address{}, mc, mux)
 	miner := &Miner{
 		mc:       mc,
 		mux:      mux,

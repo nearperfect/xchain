@@ -12,14 +12,9 @@ import (
 
 // Configuration to support the info in vnodeconfig.json
 type Configuration struct {
-	// Name   string `json:"name"`
-	SCSService             bool   `json:SCSservice`
-	ShowToPublic           bool   `json:ShowToPublic`
-	VnodeServiceCfg        string `json:VnodeServiceCfg`
-	VnodeBeneficialAddress string `json:VnodeBeneficialAddress`
-	VnodeIP                string `json:"ip"`
-	// ip                     *string //
-	ForceSubnetP2P []string `json:"ForceSubnetP2P"`
+	VssBaseAddr string `json:VssBaseAddr`
+	VnodeIP     string `json:VnodeIP`
+	VnodePort   string `json:VnodePort`
 }
 
 // GetConfiguration: read config from .json file
@@ -32,7 +27,7 @@ func GetConfiguration(configFilePath string) (*Configuration, error) {
 	log.Debugf("load vnode config file from %v", filePath)
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		//If no config file exists, return nil
-		log.Infof("%v not exists\nUse default settings", configFilePath)
+		log.Infof("%v not exists, use default settings", configFilePath)
 		return nil, nil
 	}
 
@@ -70,34 +65,4 @@ func GetUserConfig(filepath string) (*Configuration, error) {
 	json.Unmarshal(byteValue, &conf)
 
 	return &conf, nil
-}
-
-//SaveUserConifg -- Save the input configuration in the json file
-//discarded -
-func SaveUserConifg(outconfig *Configuration) bool {
-
-	filepath, _ := filepath.Abs("./vnodeconfig.json")
-
-	outfile, ferr := os.Create(filepath)
-	defer outfile.Close()
-
-	if ferr != nil {
-		//Cannot open the vnodeconfig.json file using the input filepath, save to default
-		log.Infof("Cannot open %v configuration file!", filepath)
-		return false
-	}
-	log.Infof("Save VNODE configuration to %v!", filepath)
-	outjson := ""
-	if outconfig.VnodeBeneficialAddress == "" {
-		outjson = fmt.Sprintf("{\n  \"SCSService\":%v,\n  \"ShowToPublic\":%v,\n  \"VnodeServiceCfg\":\"%v\",\n  \"ip\":\"%v\",\n  \"VnodeBeneficialAddress\":\"\"\n}", outconfig.SCSService, outconfig.ShowToPublic, outconfig.VnodeServiceCfg, outconfig.VnodeIP)
-	} else {
-		outjson = fmt.Sprintf("{\n  \"SCSService\":%v,\n  \"ShowToPublic\":%v,\n  \"VnodeServiceCfg\":\"%v\",\n  \"ip\":\"%v\",\n  \"VnodeBeneficialAddress\":\"%v\"\n}", outconfig.SCSService, outconfig.ShowToPublic, outconfig.VnodeServiceCfg, outconfig.VnodeIP, outconfig.VnodeBeneficialAddress)
-	}
-
-	_, err := outfile.WriteString(outjson)
-	if err != nil {
-		log.Info("Write output configuration file Error:", err)
-		return false
-	}
-	return true
 }

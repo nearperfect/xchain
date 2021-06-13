@@ -34,7 +34,7 @@ var iv = []byte{
 var BasePath = ""
 
 func SetBasePath(prefix string) {
-	BasePath, _ = filepath.Abs(filepath.Join(prefix, "xchainkeystore"))
+	BasePath, _ = filepath.Abs(filepath.Join(prefix, "keystorex"))
 }
 
 func Encrypt(text string, key []byte) (string, error) {
@@ -116,7 +116,7 @@ func GetPassphrace() string {
 	filepath := filepath.Join(BasePath, "Info")
 	fd, err := os.OpenFile(filepath, os.O_APPEND, os.ModePerm)
 	if err != nil {
-		log.Error("open file error")
+		log.Errorf("GetPassphrace() open file error: %v", err)
 		return ""
 	}
 	defer fd.Close()

@@ -87,7 +87,6 @@ func NewWorker(
 	coinbase common.Address,
 	mc Backend,
 	mux *event.TypeMux,
-	nr NetworkRelay,
 ) *worker {
 	log.Debugf("create new chain worker")
 	worker := &worker{
@@ -715,7 +714,6 @@ func (worker *Work) commitTransaction(
 		tx,
 		totalUsedGas,
 		vm.Config{},
-		nil,
 		nil,
 	)
 	if err != nil {

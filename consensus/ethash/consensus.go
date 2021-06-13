@@ -32,7 +32,6 @@ import (
 	"github.com/MOACChain/MoacLib/types"
 	"github.com/MOACChain/xchain/consensus"
 	"github.com/MOACChain/xchain/mc/downloader"
-	"github.com/MOACChain/xchain/networkrelay"
 	"gopkg.in/fatih/set.v0"
 )
 
@@ -475,7 +474,6 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 	header.Root = state.IntermediateRoot(true)
 
 	//Notify network relay to really notify scs servers
-	nr := networkrelay.GetInstance()
 	d := downloader.GetInstance()
 	if d != nil && d.Synchronising() {
 		highestBlock := d.Progress().HighestBlock
@@ -486,11 +484,6 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 		}
 	} else {
 		liveFlag = true
-	}
-
-	// network relay will not be initialized when importing blocks from file
-	if nr != nil {
-		go nr.NotifyScsFinalize(header.Number, liveFlag)
 	}
 
 	// Header seems complete, assemble into a block and return

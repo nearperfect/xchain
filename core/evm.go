@@ -23,11 +23,7 @@ import (
 	"github.com/MOACChain/MoacLib/types"
 	"github.com/MOACChain/MoacLib/vm"
 	"github.com/MOACChain/xchain/consensus"
-	"github.com/MOACChain/xchain/networkrelay"
 )
-
-//Pointer to handle the networkRelay
-var Nr *networkrelay.NetworkRelay
 
 // ChainContext supports retrieving headers and consensus parameters from the
 // current blockchain to be used during transaction processing.

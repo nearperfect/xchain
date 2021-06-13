@@ -52,14 +52,12 @@ import (
 	vnodeParams "github.com/MOACChain/xchain/params"
 	"github.com/MOACChain/xchain/rpc"
 	"github.com/MOACChain/xchain/sentinel"
-	"github.com/MOACChain/xchain/vnode"
 )
 
 // Add a instance of MoacService handling SCS
 var Instance *MoacService
 
 // MoacService implements the MoacService full node service.
-// 2018/07/06 Added scs interface to scsHandler
 type MoacService struct {
 	config      *Config
 	chainConfig *params.ChainConfig
@@ -72,7 +70,6 @@ type MoacService struct {
 	txPool          *core.TxPool
 	blockchain      *core.BlockChain
 	ProtocolManager *ProtocolManager
-	scsHandler      *vnode.VnodeServer
 
 	// DB interfaces
 	chainDb        mcdb.Database // Block chain database
@@ -107,11 +104,6 @@ func New(ctx *node.ServiceContext, config *Config) (*MoacService, error) {
 		return nil, fmt.Errorf("invalid sync mode %d", config.SyncMode)
 	}
 	chainDb, err := CreateDB(ctx, config, "chaindata")
-	if err != nil {
-		return nil, err
-	}
-
-	syncDb, err := CreateSyncDB(ctx, config, "syncdata")
 	if err != nil {
 		return nil, err
 	}
@@ -156,8 +148,6 @@ func New(ctx *node.ServiceContext, config *Config) (*MoacService, error) {
 	if err != nil {
 		return nil, err
 	}
-	//add by frank
-	mcSrv.scsHandler = vnode.NewScsService(chainDb, syncDb, mcSrv.blockchain, mcSrv, ctx)
 
 	// Rewind the chain in case of an incompatible config upgrade.
 	if compat, ok := genesisErr.(*params.ConfigCompatError); ok {
@@ -189,13 +179,13 @@ func New(ctx *node.ServiceContext, config *Config) (*MoacService, error) {
 		mcSrv.engine,
 		mcSrv.blockchain,
 		chainDb,
-		mcSrv.scsHandler); err != nil {
+	); err != nil {
 		return nil, err
 	}
 
 	log.Infof("sentinel ----------- %v", mcSrv.ProtocolManager.sentinel)
 
-	mcSrv.miner = miner.New(mcSrv, mcSrv.chainConfig, mcSrv.EventMux(), mcSrv.engine, mcSrv.ProtocolManager.NetworkRelay)
+	mcSrv.miner = miner.New(mcSrv, mcSrv.chainConfig, mcSrv.EventMux(), mcSrv.engine)
 	mcSrv.miner.SetExtra(makeExtraData(config.ExtraData))
 
 	mcSrv.ApiBackend = &MoacApiBackend{mcSrv, nil}
@@ -284,10 +274,10 @@ func CreateConsensusEngine(ctx *node.ServiceContext, config *Config, chainConfig
 		return ethash.NewShared()
 	default:
 		/*
-					engine := ethash.New(ctx.ResolvePath(config.EthashCacheDir), config.EthashCachesInMem, config.EthashCachesOnDisk,
-						config.EthashDatasetDir, config.EthashDatasetsInMem, config.EthashDatasetsOnDisk)
-					engine.SetThreads(-1) // Disable CPU mining
-		            return engine
+						engine := ethash.New(ctx.ResolvePath(config.EthashCacheDir), config.EthashCachesInMem, config.EthashCachesOnDisk,
+							config.EthashDatasetDir, config.EthashDatasetsInMem, config.EthashDatasetsOnDisk)
+						engine.SetThreads(-1) // Disable CPU mining
+			            return engine
 		*/
 		return pos.New()
 	}
@@ -347,11 +337,6 @@ func (s *MoacService) APIs() []rpc.API {
 			Namespace: "net",
 			Version:   "1.0",
 			Service:   s.netRPCService,
-			Public:    true,
-		}, {
-			Namespace: "vnode",
-			Version:   "1.0",
-			Service:   s.scsHandler,
 			Public:    true,
 		},
 	}...)
@@ -467,7 +452,6 @@ func (s *MoacService) Stop() error {
 	s.eventMux.Stop()
 
 	s.chainDb.Close()
-	s.scsHandler.Close()
 	log.Info("MOAC NODE shutting down....")
 	close(s.shutdownChan)
 

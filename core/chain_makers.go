@@ -85,8 +85,7 @@ func (b *BlockGen) AddTx(tx *types.Transaction) {
 	b.statedb.Prepare(tx.Hash(), common.Hash{}, len(b.txs))
 
 	//Added the networkRelay info in the Transaction
-	nr := Nr
-	receipt, _, err := ApplyTransaction(b.config, nil, &b.header.Coinbase, b.gasPool, b.statedb, b.header, tx, b.header.GasUsed, vm.Config{}, nil, nr)
+	receipt, _, err := ApplyTransaction(b.config, nil, &b.header.Coinbase, b.gasPool, b.statedb, b.header, tx, b.header.GasUsed, vm.Config{}, nil)
 	if err != nil {
 		panic(err)
 	}

@@ -694,12 +694,14 @@ func MakeAddress(ks *keystore.KeyStore, account string) (accounts.Account, error
 
 func setXchainBase(ctx *cli.Context, cfg *mc.Config) {
 	datadir := MakeDataDir(ctx)
+	keystore.SetBasePath(datadir)
 	passphrace := "xchaindefaultphrace"
 	if ctx.GlobalIsSet(XchainPasswordFlag.Name) {
 		passphrace = XchainPasswordFlag.Name
-		keystore.SavePassphrace(passphrace)
 	}
-	keystore.SetBasePath(datadir)
+	if err := keystore.SavePassphrace(passphrace); err != nil {
+		log.Errorf("SavePassphrace() err: %v", err)
+	}
 	ks, _ := keystore.GetOrCreateKeyStore()
 	log.Infof("ks %v, cfg: %v", ks, cfg)
 	cfg.XchainId = ks.Address

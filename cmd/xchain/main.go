@@ -40,7 +40,6 @@ import (
 	"github.com/MOACChain/xchain/mcclient"
 	"github.com/MOACChain/xchain/node"
 	"github.com/MOACChain/xchain/params"
-	"github.com/MOACChain/xchain/vnode"
 	"gopkg.in/urfave/cli.v1"
 )
 
@@ -211,9 +210,6 @@ func main() {
 func moac(ctx *cli.Context) error {
 	configFilePath := ctx.GlobalString(utils.VnodeConfig.Name)
 	log.Infof("vnode file %v", configFilePath)
-
-	// Start the VNODE service with SCS
-	go vnode.VnodeServiceStart(configFilePath)
 
 	// Load the VNODE config
 	go initLog(ctx)

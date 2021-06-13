@@ -508,9 +508,8 @@ func (api *PrivateDebugAPI) traceBlock(block *types.Block, logConfig *vm.LogConf
 		return false, structLogger.StructLogs(), err
 	}
 
-	nr := api.mc.ProtocolManager.NetworkRelay
 	liveFlag := false
-	receipts, _, usedGas, err := processor.Process(block, statedb, config, nr, liveFlag)
+	receipts, _, usedGas, err := processor.Process(block, statedb, config, liveFlag)
 	if err != nil {
 		return false, structLogger.StructLogs(), err
 	}
@@ -546,7 +545,18 @@ func (api *PrivateDebugAPI) ActualGas(ctx context.Context, encodedTx hexutil.Byt
 	st, _ := api.mc.BlockChain().State()
 	header := api.mc.BlockChain().CurrentBlock().Header()
 	st.Prepare(tx.Hash(), common.Hash{}, 0)
-	_, gas, err := core.ApplyTransactionForCalculateGas(api.config, api.mc.BlockChain(), nil, new(core.GasPool).AddGas(tx.GasLimit()), st, header, tx, header.GasUsed, vm.Config{}, api.mc.TxPool(), nil)
+	_, gas, err := core.ApplyTransactionForCalculateGas(
+		api.config,
+		api.mc.BlockChain(),
+		nil,
+		new(core.GasPool).AddGas(tx.GasLimit()),
+		st,
+		header,
+		tx,
+		header.GasUsed,
+		vm.Config{},
+		api.mc.TxPool(),
+	)
 	return gas, err
 }
 

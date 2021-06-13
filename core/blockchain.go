@@ -934,9 +934,7 @@ func (bc *BlockChain) WriteBlockAndState(block *types.Block, receipts []*types.R
 		bc.insert(block, false)
 	}
 	bc.futureBlocks.Remove(block.Hash())
-	if Nr != nil {
-		Nr.UpdateWhiteState(block.NumberU64())
-	}
+
 	return status, nil
 }
 
@@ -1054,7 +1052,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, liveFlag bool) (int, []int
 			return i, events, coalescedLogs, err
 		}
 		// Process block using the parent state as reference point.
-		receipts, logs, usedGas, err := bc.processor.Process(block, state, bc.vmConfig, Nr, liveFlag)
+		receipts, logs, usedGas, err := bc.processor.Process(block, state, bc.vmConfig, liveFlag)
 		if err != nil {
 			bc.reportBlock(block, receipts, err)
 			return i, events, coalescedLogs, err
