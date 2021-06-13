@@ -30,6 +30,7 @@ import (
 	"github.com/MOACChain/xchain/core"
 	"github.com/MOACChain/xchain/mc/downloader"
 	"github.com/MOACChain/xchain/mc/gasprice"
+	vnodeconfig "github.com/MOACChain/xchain/vnode/config"
 )
 
 const SubnetsConfigPrefix = "subnetsConfig"
@@ -53,6 +54,7 @@ var DefaultConfig = Config{
 		Blocks:     10,
 		Percentile: 50,
 	},
+	VnodeConfigPath: "./vnodeconfig.json",
 }
 
 func init() {
@@ -120,6 +122,10 @@ type Config struct {
 
 	// vss
 	XchainId common.Address
+
+	// Vnode config
+	VnodeConfigPath string
+	VnodeConfig     *vnodeconfig.Configuration
 }
 
 type configMarshaling struct {

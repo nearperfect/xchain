@@ -131,7 +131,7 @@ var (
 	}
 
 	vnodeConfigFlags = []cli.Flag{
-		utils.VnodeConfig,
+		utils.VnodeConfigFlag,
 	}
 )
 
@@ -208,12 +208,8 @@ func main() {
 // It creates a default node based on the command line arguments and runs it in
 // blocking mode, waiting for it to be shut down.
 func moac(ctx *cli.Context) error {
-	configFilePath := ctx.GlobalString(utils.VnodeConfig.Name)
-	log.Infof("vnode file %v", configFilePath)
-
-	// Load the VNODE config
 	go initLog(ctx)
-	log.Debugf("[cmd/moac/main.go->moac] about to call makeFullNode ctx")
+
 	// Create the full node with input config
 	node := makeFullNode(ctx)
 

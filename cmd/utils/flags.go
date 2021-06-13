@@ -28,6 +28,8 @@ import (
 	"strconv"
 	"strings"
 
+	"gopkg.in/urfave/cli.v1"
+
 	"github.com/MOACChain/MoacLib/common"
 	"github.com/MOACChain/MoacLib/crypto"
 	"github.com/MOACChain/MoacLib/log"
@@ -50,7 +52,7 @@ import (
 	"github.com/MOACChain/xchain/p2p/nat"
 	"github.com/MOACChain/xchain/p2p/netutil"
 	vnodeParams "github.com/MOACChain/xchain/params"
-	"gopkg.in/urfave/cli.v1"
+	vnodeconfig "github.com/MOACChain/xchain/vnode/config"
 )
 
 var (
@@ -464,12 +466,11 @@ var (
 		Usage: "Suggested gas price is the given percentile of a set of recent transaction gas prices",
 		Value: mc.DefaultConfig.GPO.Percentile,
 	}
-
 	// Vnodeconfig setting for SCS service
-	VnodeConfig = cli.StringFlag{
+	VnodeConfigFlag = cli.StringFlag{
 		Name:  "vnodeconfig",
 		Usage: "vnodeconfig file path",
-		Value: "./vnodeconfig.json",
+		Value: mc.DefaultConfig.VnodeConfigPath,
 	}
 )
 
@@ -687,7 +688,9 @@ func MakeAddress(ks *keystore.KeyStore, account string) (accounts.Account, error
 	}
 	accs := ks.Accounts()
 	if len(accs) <= index {
-		return accounts.Account{}, fmt.Errorf("index %d higher than number of accounts %d", index, len(accs))
+		return accounts.Account{}, fmt.Errorf(
+			"index %d higher than number of accounts %d", index, len(accs),
+		)
 	}
 	return accs[index], nil
 }
@@ -703,9 +706,28 @@ func setXchainBase(ctx *cli.Context, cfg *mc.Config) {
 		log.Errorf("SavePassphrace() err: %v", err)
 	}
 	ks, _ := keystore.GetOrCreateKeyStore()
-	log.Infof("ks %v, cfg: %v", ks, cfg)
+	log.Infof("Set xchain ID: %x", ks.Address)
 	cfg.XchainId = ks.Address
-	panic(0)
+}
+
+// setMoacbase retrieves the moacbase either from the directly specified
+// command line flags or from the keystore if CLI indexed.
+func setVnodeConfig(ctx *cli.Context, cfg *mc.Config) {
+	vnodeConfigPath := mc.DefaultConfig.VnodeConfigPath
+	if ctx.GlobalIsSet(VnodeConfigFlag.Name) {
+		vnodeConfigPath = VnodeConfigFlag.Name
+	}
+	var err error
+	if cfg.VnodeConfig, err = vnodeconfig.GetConfiguration(vnodeConfigPath); err != nil {
+		log.Errorf("Error loading vnode config: %s", vnodeConfigPath)
+	} else {
+		log.Infof(
+			"Vnode config: %s:%s, VssBase: %s",
+			cfg.VnodeConfig.VnodeIP,
+			cfg.VnodeConfig.VnodePort,
+			cfg.VnodeConfig.VssBaseAddr,
+		)
+	}
 }
 
 // setMoacbase retrieves the moacbase either from the directly specified
@@ -916,6 +938,7 @@ func SetMoacConfig(ctx *cli.Context, n *node.Node, cfg *mc.Config) {
 	checkExclusive(ctx, FastSyncFlag, SyncModeFlag)
 
 	ks := n.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
+	setVnodeConfig(ctx, cfg)
 	setMoacbase(ctx, ks, cfg)
 	setXchainBase(ctx, cfg)
 	setGPO(ctx, &cfg.GPO)
@@ -1057,7 +1080,7 @@ func MakeChain(ctx *cli.Context, node *node.Node, recoverMode bool) (chain *core
 		Fatalf("%v", err)
 	}
 	vmcfg := vm.Config{EnablePreimageRecording: ctx.GlobalBool(VMEnableDebugFlag.Name)}
-	chain, err = core.NewBlockChain(chainDb, config, engine, vmcfg)
+	chain, err = core.NewBlockChain(chainDb, config, engine, vmcfg, &vnodeconfig.Configuration{})
 	if err != nil {
 		Fatalf("Can't create BlockChain: %v", err)
 	}

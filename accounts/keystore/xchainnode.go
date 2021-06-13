@@ -193,18 +193,15 @@ func GetOrCreateKeyStore() (*KeyStoreInfo, error) {
 	log.Infof("basepath: %v", BasePath)
 
 	path, err := scanKeyFile()
-	log.Infof("000000 %v", err)
 	if err != nil {
 		log.Debug("Failed to get keystore file try to create")
 		err := CreateAccount()
 		if err != nil {
-			log.Infof("11111 %v", err)
 			return nil, err
 		}
 		path, err = scanKeyFile()
 
 		if err != nil {
-			log.Infof("22222")
 			log.Debug("Failed to get keystore file after creating")
 			return nil, err
 		}
@@ -212,7 +209,6 @@ func GetOrCreateKeyStore() (*KeyStoreInfo, error) {
 
 	fd, err := os.Open(path)
 	if err != nil {
-		log.Infof("33333")
 		log.Infof("Keystore PATH:%v\n", path)
 		log.Debug("Failed to open keystore file", "err", err)
 		return nil, err
@@ -227,7 +223,6 @@ func GetOrCreateKeyStore() (*KeyStoreInfo, error) {
 	// get the file string, return error
 	buf_len, berr := fd.Seek(0, os.SEEK_END)
 	if berr != nil {
-		log.Infof("44444")
 		log.Infof("Failed to find the length of the key store file")
 		return nil, err
 	}

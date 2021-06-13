@@ -144,7 +144,8 @@ func New(ctx *node.ServiceContext, config *Config) (*MoacService, error) {
 
 	vmConfig := vm.Config{EnablePreimageRecording: config.EnablePreimageRecording}
 
-	mcSrv.blockchain, err = core.NewBlockChain(chainDb, mcSrv.chainConfig, mcSrv.engine, vmConfig)
+	mcSrv.blockchain, err = core.NewBlockChain(
+		chainDb, mcSrv.chainConfig, mcSrv.engine, vmConfig, mcSrv.config.VnodeConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -279,7 +280,7 @@ func CreateConsensusEngine(ctx *node.ServiceContext, config *Config, chainConfig
 						engine.SetThreads(-1) // Disable CPU mining
 			            return engine
 		*/
-		return pos.New()
+		return pos.New(config.VnodeConfig)
 	}
 }
 

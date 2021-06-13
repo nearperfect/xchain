@@ -18,6 +18,7 @@ package sentinel
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -28,6 +29,7 @@ import (
 	"github.com/MOACChain/xchain/event"
 	"github.com/MOACChain/xchain/mcclient"
 	"github.com/MOACChain/xchain/mcclient/xdefi"
+	"github.com/MOACChain/xchain/vnode/config"
 )
 
 type Sentinel struct {
@@ -35,6 +37,7 @@ type Sentinel struct {
 	scope          event.SubscriptionScope
 	chainHeadCh    chan core.ChainHeadEvent
 	chainHeadSub   event.Subscription
+	config         *config.Configuration
 
 	// vault events
 	VaultEventsReceived  map[common.Hash]int
@@ -57,6 +60,7 @@ func New(bc *core.BlockChain) *Sentinel {
 		VaultEventsReceived:  make(map[common.Hash]int),
 		VaultEventsNonce:     make(map[TokenMapping]map[*big.Int]*core.VaultEvent),
 		VaultEventsWatermark: make(map[TokenMapping]*big.Int),
+		config:               bc.VnodeConfig(),
 	}
 	sentinel.scope.Open()
 	sentinel.chainHeadSub = bc.SubscribeChainHeadEvent(sentinel.chainHeadCh)
@@ -107,7 +111,12 @@ func (sentinel *Sentinel) start() {
 		sentinel.PrintVaultEventsReceived()
 
 		// init rpc client
-		client, err := mcclient.Dial("http://172.21.0.11:8545")
+		url := fmt.Sprintf(
+			"http://%s:%s",
+			sentinel.config.VnodeIP,
+			sentinel.config.VnodePort,
+		)
+		client, err := mcclient.Dial(url)
 		if err != nil {
 			log.Errorf("Unable to connect to network:%v\n", err)
 			continue
@@ -131,6 +140,10 @@ func (sentinel *Sentinel) start() {
 			[]common.Address{},
 			[]*big.Int{},
 		)
+		if err != nil {
+			log.Errorf("Unable to get token deposit iterator: %v", err)
+			continue
+		}
 		for itr.Next() {
 			event := itr.Event
 			vaultEvent := core.VaultEvent{

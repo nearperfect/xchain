@@ -43,6 +43,7 @@ import (
 	"github.com/MOACChain/MoacLib/vm"
 	"github.com/MOACChain/xchain/consensus"
 	"github.com/MOACChain/xchain/event"
+	vnodeconfig "github.com/MOACChain/xchain/vnode/config"
 )
 
 var (
@@ -109,10 +110,11 @@ type BlockChain struct {
 	procInterrupt int32          // interrupt signaler for block processing
 	wg            sync.WaitGroup // chain processing wait group for shutting down
 
-	engine    consensus.Engine
-	processor Processor // block processor interface
-	validator Validator // block and state validator interface
-	vmConfig  vm.Config
+	engine      consensus.Engine
+	processor   Processor // block processor interface
+	validator   Validator // block and state validator interface
+	vmConfig    vm.Config
+	vnodeConfig *vnodeconfig.Configuration
 
 	badBlocks *lru.Cache // Bad block cache
 }
@@ -120,7 +122,7 @@ type BlockChain struct {
 // NewBlockChain returns a fully initialised block chain using information
 // available in the database. It initialises the default MoacNode Validator and
 // Processor.
-func NewBlockChain(chainDb mcdb.Database, config *params.ChainConfig, engine consensus.Engine, vmConfig vm.Config) (*BlockChain, error) {
+func NewBlockChain(chainDb mcdb.Database, config *params.ChainConfig, engine consensus.Engine, vmConfig vm.Config, vnodeConfig *vnodeconfig.Configuration) (*BlockChain, error) {
 	bodyCache, _ := lru.New(bodyCacheLimit)
 	bodyRLPCache, _ := lru.New(bodyCacheLimit)
 	blockCache, _ := lru.New(blockCacheLimit)
@@ -138,6 +140,7 @@ func NewBlockChain(chainDb mcdb.Database, config *params.ChainConfig, engine con
 		futureBlocks: futureBlocks,
 		engine:       engine,
 		vmConfig:     vmConfig,
+		vnodeConfig:  vnodeConfig,
 		badBlocks:    badBlocks,
 	}
 	bc.scope.Open()
@@ -1445,6 +1448,8 @@ func (bc *BlockChain) GetHeaderByNumber(number uint64) *types.Header {
 
 // Config retrieves the blockchain's chain configuration.
 func (bc *BlockChain) Config() *params.ChainConfig { return bc.config }
+
+func (bc *BlockChain) VnodeConfig() *vnodeconfig.Configuration { return bc.vnodeConfig }
 
 // ChainId retrieves the blockchain's chain ChainId.
 func (bc *BlockChain) ChainId() *big.Int { return bc.config.ChainId }

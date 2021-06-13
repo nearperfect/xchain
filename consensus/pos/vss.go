@@ -441,7 +441,7 @@ func (pos *Pos) HandleSigShares() {
 }
 
 func (pos *Pos) LoadVSSKey() {
-	vsskeyBytes := keystore.GetVSSKey(pos.VssBaseContractAddress)
+	vsskeyBytes := keystore.GetVSSKey(common.HexToAddress(pos.vnodeconfig.VssBaseAddr))
 	vsskey := &VSSKey{}
 	if len(vsskeyBytes) == 0 {
 		vsskey = GenerateVSSKey()
@@ -450,7 +450,9 @@ func (pos *Pos) LoadVSSKey() {
 		pVSSKey := ToPersistVSSKey(vsskey)
 		data, _ := json.Marshal(pVSSKey)
 		log.Debugf("vss can not find vss key & generated new one: %s", string(data))
-		if err := keystore.PutVSSKey(pos.VssBaseContractAddress, data); err != nil {
+		if err := keystore.PutVSSKey(
+			common.HexToAddress(pos.vnodeconfig.VssBaseAddr), data,
+		); err != nil {
 			log.Errorf("vss key can not be stored: %v", err)
 		}
 
@@ -774,7 +776,7 @@ func (pos *Pos) UpdateVSSConfig() int {
 	verifyPublicShares := make(map[common.Address]*[]*share.PubShare)
 	signedPublicShares := make(map[common.Address]PersistPublicShares)
 	pubshares, err := pos.GetVSSShares(
-		pos.VssBaseContractAddress,
+		common.HexToAddress(pos.vnodeconfig.VssBaseAddr),
 		"getPublicShares",
 		activeNodeList,
 	)
@@ -808,7 +810,7 @@ func (pos *Pos) UpdateVSSConfig() int {
 	verifyPrivateShares := make(map[common.Address]*[]*share.PriShare)
 	signedPrivateShares := make(map[common.Address]PersistPrivateShares)
 	prishares, err := pos.GetVSSShares(
-		pos.VssBaseContractAddress,
+		common.HexToAddress(pos.vnodeconfig.VssBaseAddr),
 		"getPrivateShares",
 		activeNodeList,
 	)
@@ -1009,7 +1011,10 @@ func (pos *Pos) setVssConfig(vssConfigVersion int) {
 
 func (pos *Pos) IsVSSEnabled() bool {
 	var NullAddress common.Address
-	res := bytes.Compare(pos.VssBaseContractAddress[:common.AddressLength], NullAddress[:common.AddressLength])
+	res := bytes.Compare(
+		common.HexToAddress(pos.vnodeconfig.VssBaseAddr).Bytes()[:common.AddressLength],
+		NullAddress[:common.AddressLength],
+	)
 	return res != 0
 }
 

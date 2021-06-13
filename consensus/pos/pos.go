@@ -19,6 +19,7 @@ package pos
 
 import (
 	"container/list"
+	"fmt"
 	"sync"
 	"time"
 
@@ -29,29 +30,29 @@ import (
 	"github.com/MOACChain/xchain/accounts/abi/bind"
 	"github.com/MOACChain/xchain/mcclient"
 	"github.com/MOACChain/xchain/mcclient/xdefi"
+	"github.com/MOACChain/xchain/vnode/config"
 )
 
 // Pos is a consensus engine
 type Pos struct {
 	// vss
-	Vssid                  common.Address
-	VssBaseContractAddress common.Address
-	Bls                    *BLS
-	prevbls                *list.List
-	Vss                    *VSS
-	AllSigs                *gocache.Cache // blockhash -> sig sha
-	VssKey                 *VSSKey
-	vssIsrunningMutex      sync.Mutex
-	vssEnabled             bool
-	nodesPubkey            map[common.Address][]byte
-	Position               int
-	NodeList               []common.Address
-	vssSeenConfigs         map[uint64]bool
-	vssSettings            map[int]*BLS // config version ==> bls obj
-	currentConfigVersion   int          // current vss config version
-	uploadedConfigTime     time.Time    // time when the last config was uploaded
-	AddressToIndex         map[string]int
-	IndexToAddress         map[int]string
+	Vssid                common.Address
+	Bls                  *BLS
+	prevbls              *list.List
+	Vss                  *VSS
+	AllSigs              *gocache.Cache // blockhash -> sig sha
+	VssKey               *VSSKey
+	vssIsrunningMutex    sync.Mutex
+	vssEnabled           bool
+	nodesPubkey          map[common.Address][]byte
+	Position             int
+	NodeList             []common.Address
+	vssSeenConfigs       map[uint64]bool
+	vssSettings          map[int]*BLS // config version ==> bls obj
+	currentConfigVersion int          // current vss config version
+	uploadedConfigTime   time.Time    // time when the last config was uploaded
+	AddressToIndex       map[string]int
+	IndexToAddress       map[int]string
 
 	// vss stats
 	ReceivedBlocks  map[string]bool
@@ -62,20 +63,23 @@ type Pos struct {
 	callOpts     *bind.CallOpts
 	transactOpts *bind.TransactOpts
 	vssbase      *xdefi.VssBase
+	vnodeconfig  *config.Configuration
 }
 
 // New creates a full sized pos PoW scheme.
-func New() *Pos {
-	client, _ := mcclient.Dial("http://172.21.0.11:8545")
+func New(cfg *config.Configuration) *Pos {
+	url := fmt.Sprintf("http://%s:%s", cfg.VnodeIP, cfg.VnodePort)
+	client, _ := mcclient.Dial(url)
 	vssbase, _ := xdefi.NewVssBase(
-		common.HexToAddress("0xABE1A1A941C9666ac221B041aC1cFE6167e1F1D0"),
+		common.HexToAddress(cfg.VssBaseAddr),
 		client,
 	)
 	pos := &Pos{
-		vssEnabled: true,
-		client:     client,
-		callOpts:   &bind.CallOpts{},
-		vssbase:    vssbase,
+		vssEnabled:  true,
+		client:      client,
+		callOpts:    &bind.CallOpts{},
+		vssbase:     vssbase,
+		vnodeconfig: cfg,
 	}
 
 	// vss config loop

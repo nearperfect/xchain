@@ -56,7 +56,7 @@ type Work struct {
 type worker struct {
 	config           *params.ChainConfig
 	chain            *core.BlockChain
-	pos              pos.Pos
+	pos              *pos.Pos
 	mu               sync.Mutex
 	mux              *event.TypeMux // update loop
 	blockGenTimerCh  chan core.BlockGenTimerEvent
@@ -94,9 +94,10 @@ func NewWorker(
 		mux:              mux,
 		blockGenTimerCh:  make(chan core.BlockGenTimerEvent, ChainHeadChanSize),
 		chain:            mc.BlockChain(),
-		pos:              engine.(pos.Pos),
+		pos:              engine.(*pos.Pos),
 		blockGenEpochBLS: make(chan int64),
 		mc:               mc,
+		agents:           make(map[Agent]struct{}),
 	}
 
 	worker.blockGenTimerSub = mc.BlockChain().SubscribeBlockGenTimerEvent(worker.blockGenTimerCh)
