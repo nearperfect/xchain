@@ -55,6 +55,10 @@ import (
 	vnodeconfig "github.com/MOACChain/xchain/vnode/config"
 )
 
+const (
+	xchainPassphrace = "xchaindefaultphrace"
+)
+
 var (
 	CommandHelpTemplate = `{{.cmd.Name}}{{if .cmd.Subcommands}} command{{end}}{{if .cmd.Flags}} [command options]{{end}} [arguments...]
 {{if .cmd.Description}}{{.cmd.Description}}
@@ -297,7 +301,7 @@ var (
 	XchainPasswordFlag = cli.StringFlag{
 		Name:  "xchainpassword",
 		Usage: "Password for xchain node keystore",
-		Value: "",
+		Value: xchainPassphrace,
 	}
 	VMEnableDebugFlag = cli.BoolFlag{
 		Name:  "vmdebug",
@@ -697,17 +701,23 @@ func MakeAddress(ks *keystore.KeyStore, account string) (accounts.Account, error
 
 func setXchainBase(ctx *cli.Context, cfg *mc.Config) {
 	datadir := MakeDataDir(ctx)
-	keystore.SetBasePath(datadir)
-	passphrace := "xchaindefaultphrace"
+	keystore.SetXBasePath(datadir)
+
+	passphrace := xchainPassphrace
 	if ctx.GlobalIsSet(XchainPasswordFlag.Name) {
 		passphrace = XchainPasswordFlag.Name
 	}
-	if err := keystore.SavePassphrace(passphrace); err != nil {
+	if err := keystore.SaveXPassphrace(passphrace); err != nil {
 		log.Errorf("SavePassphrace() err: %v", err)
 	}
-	ks, _ := keystore.GetOrCreateKeyStore()
-	log.Infof("Set xchain ID: %x", ks.Address)
-	cfg.XchainId = ks.Address
+	ksInfo, _ := keystore.GetOrCreateXKeyStore()
+	log.Infof("Set xchain ID: %x", ksInfo.Address)
+	cfg.XchainId = ksInfo.Address
+
+	ks := keystore.NewKeyStore(keystore.XBasePath, keystore.StandardScryptN, keystore.StandardScryptP)
+	account, _ := MakeAddress(ks, ksInfo.Address.Hex())
+	_, key, _ := keystore.GetXDecryptedKey(account, passphrace)
+	cfg.XchainKey = key
 }
 
 // setMoacbase retrieves the moacbase either from the directly specified

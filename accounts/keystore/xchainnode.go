@@ -16,6 +16,7 @@ import (
 
 	"github.com/MOACChain/MoacLib/common"
 	"github.com/MOACChain/MoacLib/log"
+	"github.com/MOACChain/xchain/accounts"
 )
 
 type KeyStoreInfo struct {
@@ -31,13 +32,13 @@ var iv = []byte{
 	0x7A, 0x3D, 0x5F, 0x06, 0x41, 0x9B, 0x3F, 0x2D,
 }
 
-var BasePath = ""
+var XBasePath = ""
 
-func SetBasePath(prefix string) {
-	BasePath, _ = filepath.Abs(filepath.Join(prefix, "keystorex"))
+func SetXBasePath(prefix string) {
+	XBasePath, _ = filepath.Abs(filepath.Join(prefix, "keystorex"))
 }
 
-func Encrypt(text string, key []byte) (string, error) {
+func EncryptX(text string, key []byte) (string, error) {
 	var iv = key[:aes.BlockSize]
 	encrypted := make([]byte, len(text))
 	block, err := aes.NewCipher(key)
@@ -49,7 +50,7 @@ func Encrypt(text string, key []byte) (string, error) {
 	return hex.EncodeToString(encrypted), nil
 }
 
-func Decrypt(encrypted string, key []byte) (string, error) {
+func DecryptX(encrypted string, key []byte) (string, error) {
 	var err error
 	defer func() {
 		if e := recover(); e != nil {
@@ -76,14 +77,14 @@ func Decrypt(encrypted string, key []byte) (string, error) {
  * Save the passphrace with keystore file
  * for later usage.
  */
-func SavePassphrace(passphrase string) error {
+func SaveXPassphrace(passphrase string) error {
 	//Encrypt the passphrase into a file
-	encrypt, _ := Encrypt(passphrase, iv)
+	encrypt, _ := EncryptX(passphrase, iv)
 
 	//Save with keystore
-	stat, err := os.Stat(BasePath)
+	stat, err := os.Stat(XBasePath)
 	if err != nil {
-		ferr := os.MkdirAll(BasePath, os.ModePerm)
+		ferr := os.MkdirAll(XBasePath, os.ModePerm)
 		if ferr != nil {
 			return ferr
 		} else {
@@ -92,10 +93,10 @@ func SavePassphrace(passphrase string) error {
 	}
 
 	//Check again for the base path
-	stat, err = os.Stat(BasePath)
+	stat, err = os.Stat(XBasePath)
 
 	if err == nil && stat.IsDir() {
-		filepath := filepath.Join(BasePath, "Info")
+		filepath := filepath.Join(XBasePath, "Info")
 		err = ioutil.WriteFile(filepath, []byte(encrypt), os.ModePerm)
 		if err != nil {
 			log.Error("write file err")
@@ -112,8 +113,8 @@ func SavePassphrace(passphrase string) error {
 }
 
 //Get the passphrace from file
-func GetPassphrace() string {
-	filepath := filepath.Join(BasePath, "Info")
+func GetXPassphrace() string {
+	filepath := filepath.Join(XBasePath, "Info")
 	fd, err := os.OpenFile(filepath, os.O_APPEND, os.ModePerm)
 	if err != nil {
 		log.Errorf("GetPassphrace() open file error: %v", err)
@@ -127,18 +128,18 @@ func GetPassphrace() string {
 	bufio := make([]byte, buf_len)
 	fd.Read(bufio)
 	encrypt := string(bufio[:])
-	decrypt, _ := Decrypt(encrypt, iv)
+	decrypt, _ := DecryptX(encrypt, iv)
 
 	return decrypt
 }
 
-func CreateAccount() error {
-	passphrase := GetPassphrace()
+func CreateXAccount() error {
+	passphrase := GetXPassphrace()
 	if len(passphrase) == 0 {
 		return errors.New("Need to have a valid passphrase, program exit!")
 	}
 	// Create an encrypted keystore with standard crypto parameters
-	ks := NewKeyStore(BasePath, StandardScryptN, StandardScryptP)
+	ks := NewKeyStore(XBasePath, StandardScryptN, StandardScryptP)
 	// Create account
 	a, err := ks.NewAccount(passphrase)
 	log.Debug("Created account", "Address:", a.Address, "URL:", a.URL)
@@ -151,15 +152,15 @@ func CreateAccount() error {
 }
 
 // scan and locate the keystore file
-func scanKeyFile() (string, error) {
-	files, err := ioutil.ReadDir(BasePath)
+func scanXKeyFile() (string, error) {
+	files, err := ioutil.ReadDir(XBasePath)
 
 	if err != nil {
 		return "", err
 	}
 
 	for _, fi := range files {
-		path := filepath.Join(BasePath, fi.Name())
+		path := filepath.Join(XBasePath, fi.Name())
 		// Skip editor backups and UNIX-style hidden files.
 		if strings.HasSuffix(fi.Name(), "~") || strings.HasPrefix(fi.Name(), ".") {
 			continue
@@ -179,7 +180,7 @@ func scanKeyFile() (string, error) {
 	return "", errors.New("KeyFile not found.")
 }
 
-func GetOrCreateKeyStore() (*KeyStoreInfo, error) {
+func GetOrCreateXKeyStore() (*KeyStoreInfo, error) {
 	var (
 		buf        = new(bufio.Reader)
 		address    common.Address
@@ -189,17 +190,17 @@ func GetOrCreateKeyStore() (*KeyStoreInfo, error) {
 		}
 	)
 	// Create base path
-	os.MkdirAll(BasePath, os.ModePerm)
-	log.Infof("basepath: %v", BasePath)
+	os.MkdirAll(XBasePath, os.ModePerm)
+	log.Infof("basepath: %v", XBasePath)
 
-	path, err := scanKeyFile()
+	path, err := scanXKeyFile()
 	if err != nil {
 		log.Debug("Failed to get keystore file try to create")
-		err := CreateAccount()
+		err := CreateXAccount()
 		if err != nil {
 			return nil, err
 		}
-		path, err = scanKeyFile()
+		path, err = scanXKeyFile()
 
 		if err != nil {
 			log.Debug("Failed to get keystore file after creating")
@@ -242,9 +243,14 @@ func GetOrCreateKeyStore() (*KeyStoreInfo, error) {
 
 	return &KeyStoreInfo{
 		Address:    address,
-		Passphrace: GetPassphrace(),
+		Passphrace: GetXPassphrace(),
 		KeyStore:   jsonString,
 	}, nil
+}
+
+func GetXDecryptedKey(a accounts.Account, passphrase string) (accounts.Account, *Key, error) {
+	ks := NewKeyStore(XBasePath, StandardScryptN, StandardScryptP)
+	return ks.getDecryptedKey(a, passphrase)
 }
 
 ////////////////////////////
@@ -252,7 +258,7 @@ func GetOrCreateKeyStore() (*KeyStoreInfo, error) {
 ////////////////////////////
 
 func vssKeyFileName(subChainAddr common.Address) string {
-	return filepath.Join(BasePath, fmt.Sprintf("%x.vsskey", subChainAddr))
+	return filepath.Join(XBasePath, fmt.Sprintf("%x.vsskey", subChainAddr))
 }
 
 func GetVSSKey(subChainAddr common.Address) []byte {

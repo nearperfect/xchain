@@ -280,7 +280,7 @@ func CreateConsensusEngine(ctx *node.ServiceContext, config *Config, chainConfig
 						engine.SetThreads(-1) // Disable CPU mining
 			            return engine
 		*/
-		return pos.New(config.VnodeConfig)
+		return pos.New(config.VnodeConfig, config.XchainId, config.XchainKey)
 	}
 }
 

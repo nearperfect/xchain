@@ -14,6 +14,7 @@ type Configuration struct {
 	VssBaseAddr string `json:VssBaseAddr`
 	VnodeIP     string `json:VnodeIP`
 	VnodePort   string `json:VnodePort`
+	ChainId     int    `json:ChainId`
 }
 
 // GetConfiguration: read config from .json file

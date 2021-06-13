@@ -91,6 +91,17 @@ between MOAC nodes by simply copying.
 Make sure you backup your keys regularly.`,
 		Subcommands: []cli.Command{
 			{
+				Name:   "listx",
+				Usage:  "Print summary of existing accounts for xchain",
+				Action: utils.MigrateFlags(accountListX),
+				Flags: []cli.Flag{
+					utils.DataDirFlag,
+					utils.KeyStoreDirFlag,
+				},
+				Description: `
+Print a short summary of all accounts`,
+			},
+			{
 				Name:   "list",
 				Usage:  "Print summary of existing accounts",
 				Action: utils.MigrateFlags(accountList),
@@ -99,7 +110,7 @@ Make sure you backup your keys regularly.`,
 					utils.KeyStoreDirFlag,
 				},
 				Description: `
-Print a short summary of all accounts`,
+Print the xchain account address`,
 			},
 			{
 				Name:   "new",
@@ -124,6 +135,17 @@ For non-interactive use the passphrase can be specified with the --password flag
 Note, this is meant to be used for testing only, it is a bad idea to save your
 password to file or expose in any other way.
 `,
+			},
+			{
+				Name:   "newx",
+				Usage:  "Create a new xchain account",
+				Action: utils.MigrateFlags(accountCreateX),
+				Flags: []cli.Flag{
+					utils.DataDirFlag,
+					utils.KeyStoreDirFlag,
+					utils.PasswordFileFlag,
+				},
+				Description: `Create a new xchain account`,
 			},
 			{
 				Name:      "update",
@@ -195,9 +217,37 @@ func accountList(ctx *cli.Context) error {
 	for _, wallet := range stack.AccountManager().Wallets() {
 		for _, account := range wallet.Accounts() {
 			fmt.Printf("Account #%d: {%s} %s\n", index, account.Address, &account.URL)
-			//fmt.Printf("Account #%d: {%s} %s\n", index, account.MoacAdd, &account.URL)
 			index++
 		}
+	}
+	return nil
+}
+
+func accountListX(ctx *cli.Context) error {
+	datadir := utils.MakeDataDir(ctx)
+	keystore.SetXBasePath(datadir)
+	ks := keystore.NewKeyStore(keystore.XBasePath, keystore.StandardScryptN, keystore.StandardScryptP)
+	for index, account := range ks.Accounts() {
+		fmt.Printf("Account #%d: {0x%x}\n", index, account.Address)
+	}
+	return nil
+}
+
+// accountCreate creates a new account into the keystore defined by the CLI flags.
+func accountCreateX(ctx *cli.Context) error {
+	datadir := utils.MakeDataDir(ctx)
+	keystore.SetXBasePath(datadir)
+	ks := keystore.NewKeyStore(keystore.XBasePath, keystore.StandardScryptN, keystore.StandardScryptP)
+	if len(ks.Accounts()) > 0 {
+		fmt.Printf("XChain Account exist already. There should be only one XChain account\n")
+		return nil
+	} else {
+		keystore.GetOrCreateXKeyStore()
+	}
+	fmt.Printf("XChain account created:\n")
+	ks = keystore.NewKeyStore(keystore.XBasePath, keystore.StandardScryptN, keystore.StandardScryptP)
+	for index, account := range ks.Accounts() {
+		fmt.Printf("Account #%d: {0x%x}\n", index, account.Address)
 	}
 	return nil
 }

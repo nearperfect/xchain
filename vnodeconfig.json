@@ -1,5 +1,6 @@
 {
-    "VnodeIP": "127.0.0.1",
+    "VnodeIP": "172.21.0.11",
     "VnodePort": "8545",
-    "VssBaseAddr": "0xABE1A1A941C9666ac221B041aC1cFE6167e1F1D0"
+    "ChainId": 95125,
+    "VssBaseAddr": "0xcCa8BAA2d1E83A38bdbcF52a9e5BbB530f50493A"
 }

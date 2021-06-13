@@ -20,6 +20,7 @@ package pos
 import (
 	"container/list"
 	"fmt"
+	"math/big"
 	"sync"
 	"time"
 
@@ -28,6 +29,7 @@ import (
 	"github.com/MOACChain/MoacLib/common"
 	"github.com/MOACChain/MoacLib/log"
 	"github.com/MOACChain/xchain/accounts/abi/bind"
+	"github.com/MOACChain/xchain/accounts/keystore"
 	"github.com/MOACChain/xchain/mcclient"
 	"github.com/MOACChain/xchain/mcclient/xdefi"
 	"github.com/MOACChain/xchain/vnode/config"
@@ -47,7 +49,7 @@ type Pos struct {
 	nodesPubkey          map[common.Address][]byte
 	Position             int
 	NodeList             []common.Address
-	vssSeenConfigs       map[uint64]bool
+	vssSeenConfigs       map[int]bool
 	vssSettings          map[int]*BLS // config version ==> bls obj
 	currentConfigVersion int          // current vss config version
 	uploadedConfigTime   time.Time    // time when the last config was uploaded
@@ -67,19 +69,29 @@ type Pos struct {
 }
 
 // New creates a full sized pos PoW scheme.
-func New(cfg *config.Configuration) *Pos {
+func New(cfg *config.Configuration, vssid common.Address, key *keystore.Key) *Pos {
 	url := fmt.Sprintf("http://%s:%s", cfg.VnodeIP, cfg.VnodePort)
 	client, _ := mcclient.Dial(url)
 	vssbase, _ := xdefi.NewVssBase(
 		common.HexToAddress(cfg.VssBaseAddr),
 		client,
 	)
+	transactor, _ := bind.NewKeyedTransactorWithChainID(
+		key.PrivateKey,
+		big.NewInt(int64(cfg.ChainId)),
+	)
 	pos := &Pos{
-		vssEnabled:  true,
-		client:      client,
-		callOpts:    &bind.CallOpts{},
-		vssbase:     vssbase,
-		vnodeconfig: cfg,
+		vssEnabled:     true,
+		client:         client,
+		callOpts:       &bind.CallOpts{},
+		transactOpts:   transactor,
+		vssbase:        vssbase,
+		vnodeconfig:    cfg,
+		vssSeenConfigs: make(map[int]bool),
+		vssSettings:    make(map[int]*BLS),
+		AddressToIndex: make(map[string]int),
+		IndexToAddress: make(map[int]string),
+		Vssid:          vssid,
 	}
 
 	// vss config loop
@@ -87,10 +99,20 @@ func New(cfg *config.Configuration) *Pos {
 		log.Debugf("vss enabled, ready to run vss loop")
 		// init vsskey
 		pos.LoadVSSKey()
-		go pos.VssStateLoop()        // for updating config
-		go pos.VssSlashingLoop()     // for checking slash
-		go pos.VssUploadConfigLoop() // for uploading config
-		go pos.NewVnodeBlockLoop()   // for checking new block in vnode
+		if pos.IsActiveVss() {
+			pos.registerVss()
+			pos.activateVss()
+			time.Sleep(30 * time.Second)
+		}
+
+		if pos.IsActiveVss() {
+			go pos.VssStateLoop()        // for updating config
+			go pos.VssSlashingLoop()     // for checking slash
+			go pos.VssUploadConfigLoop() // for uploading config
+			go pos.NewVnodeBlockLoop()   // for checking new block in vnode
+		} else {
+			log.Infof("--------------------------    no vss loop")
+		}
 	}
 
 	return pos

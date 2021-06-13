@@ -27,6 +27,7 @@ import (
 	"github.com/MOACChain/MoacLib/common/hexutil"
 	"github.com/MOACChain/MoacLib/mcdb"
 	"github.com/MOACChain/MoacLib/params"
+	"github.com/MOACChain/xchain/accounts/keystore"
 	"github.com/MOACChain/xchain/core"
 	"github.com/MOACChain/xchain/mc/downloader"
 	"github.com/MOACChain/xchain/mc/gasprice"
@@ -121,7 +122,8 @@ type Config struct {
 	PowShared bool   `toml:"-"`
 
 	// vss
-	XchainId common.Address
+	XchainId  common.Address
+	XchainKey *keystore.Key
 
 	// Vnode config
 	VnodeConfigPath string

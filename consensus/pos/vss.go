@@ -76,7 +76,9 @@ var (
 )
 
 func (pos *Pos) IsVSSReady() bool {
-	return pos.vssEnabled && pos.Bls != nil && pos.Bls.GroupPrivateShare != nil
+	ret := pos.vssEnabled && pos.Bls != nil && pos.Bls.GroupPrivateShare != nil
+	log.Infof("--------------------------- IsVSSReady: %t", ret)
+	return ret
 }
 
 func (pos *Pos) ShouldSkipVSS(blockNumber int64) bool {
@@ -121,6 +123,12 @@ func (pos *Pos) GetVSSNodesPubkey(
 	} else {
 		return result, nil
 	}
+}
+
+func (pos *Pos) IsActiveVss() bool {
+	// noreg = 0, active = 1, inactive = 2
+	ret, _ := pos.vssbase.VssNodeMemberships(pos.callOpts, pos.Vssid)
+	return ret.Int64() == 1
 }
 
 func (pos *Pos) GetVSSNodesIndexs(activeMemberList []common.Address) map[common.Address]int {
@@ -556,8 +564,8 @@ func (pos *Pos) VssSlashingLoop() {
 		case <-RevealedShareChan:
 			lastSlashVoted := pos.GetLastSlashVoted()
 			contractRevealIndex := pos.GetRevealIndex()
-			log.Debugf(
-				"vss slashing loop, lastSlashVoted: %d, contractRevealIndex: %d",
+			log.Infof(
+				"-------------------------------  vss slashing loop, lastSlashVoted: %d, contractRevealIndex: %d",
 				lastSlashVoted,
 				contractRevealIndex,
 			)
@@ -681,7 +689,7 @@ func (pos *Pos) RunVssStateMachine() {
 	// converge to the same state given that config version change is rare (add new node
 	// or delete old node).
 	vssConfigVersion := pos.GetVssConfigVersion()
-	if seen := pos.vssSeenConfigs[vssConfigVersion]; !seen {
+	if seen := pos.vssSeenConfigs[int(vssConfigVersion)]; !seen {
 		// if not found, the it is a new state
 		// we should call updateVssConfig() to get the latest vss setting
 		updateResult := pos.UpdateVSSConfig()
@@ -692,7 +700,7 @@ func (pos *Pos) RunVssStateMachine() {
 		)
 		// if we don't need to recheck, mark this as seen
 		if updateResult != VssConfigRecheck {
-			pos.vssSeenConfigs[vssConfigVersion] = true
+			pos.vssSeenConfigs[int(vssConfigVersion)] = true
 		}
 	} else {
 		// we have seen this vss config before, so we either voted or revealed
@@ -1335,6 +1343,20 @@ func (pos *Pos) vssSlashing(index int, slash bool) {
 func (pos *Pos) vssReportSlowNode(slowNode common.Address) {
 	_, err := pos.vssbase.ReportSlowNode(pos.transactOpts, slowNode)
 	log.Debugf("vss report slow node: %s, %v", slowNode, err)
+}
+
+func (pos *Pos) registerVss() {
+	var pubkey32 [32]byte
+	vsskey := ToPersistVSSKey(pos.VssKey)
+	copy(pubkey32[:], vsskey.Public[:32])
+
+	_, err := pos.vssbase.RegisterVSS(pos.transactOpts, pos.Vssid, pubkey32)
+	log.Debugf("vss register vss: %v", err)
+}
+
+func (pos *Pos) activateVss() {
+	_, err := pos.vssbase.ActivateVSS(pos.transactOpts, pos.Vssid)
+	log.Debugf("vss activate vss: %v", err)
 }
 
 func (pos *Pos) FindAddressInNodelist(myAddr common.Address) (int, int) {
