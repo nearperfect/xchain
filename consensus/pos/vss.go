@@ -112,7 +112,7 @@ func (pos *Pos) GetVSSNodesPubkey(
 	publickeys, _ := pos.vssbase.GetVSSNodesPubkey(pos.callOpts, activeNodeList)
 	for i, addr := range activeNodeList {
 		result[addr] = publickeys[i][:]
-		log.Debugf("pub key for addr: %x is %x", addr.Bytes(), publickeys[i])
+		log.Infof("pub key for addr: %x is %x", addr.Bytes(), publickeys[i])
 		if len(publickeys[i]) == 32 {
 			emptyPubkey++
 		}
@@ -218,7 +218,7 @@ func (pos *Pos) GetVSSShares(
 					io.Copy(bufunzip, zr)
 					vssShares := bufunzip.Bytes()
 					receivedVSSShares[addr] = vssShares
-					log.Debugf(
+					log.Infof(
 						"Received (%v/%v) %v shares: %v, err: %v",
 						len(receivedVSSShares),
 						len(activeNodeList),
@@ -256,7 +256,7 @@ func (pos *Pos) GetVSSShares(
 
 func (pos *Pos) GetBlsSig(sigShareKey string) ([]byte, error) {
 	timeoutInterval := params.BlockInterval
-	log.Debugf(
+	log.Infof(
 		"vss call GetBlsSig() with key: %v, allsigs count: %d",
 		sigShareKey,
 		pos.AllSigs.ItemCount(),
@@ -271,7 +271,7 @@ func (pos *Pos) GetBlsSig(sigShareKey string) ([]byte, error) {
 		time.Sleep(1 * time.Second)
 	}
 
-	log.Debugf("Wait for vss result timeout")
+	log.Infof("Wait for vss result timeout")
 	return []byte{}, fmt.Errorf("wait for vss result timeout")
 }
 
@@ -288,7 +288,7 @@ func (pos *Pos) ValidateProposerSig(
 	}
 
 	if !pos.IsVSSReady() {
-		log.Debugf("validate proposer sig failed, bls is not ready")
+		log.Infof("validate proposer sig failed, bls is not ready")
 		return false
 	}
 
@@ -299,7 +299,7 @@ func (pos *Pos) ValidateProposerSig(
 		pubkey.UnmarshalFrom(bytes.NewReader(pubkeyBytes))
 		validated, err := VerifyED25519(pubkey, blsSig, proposerSig)
 		if validated {
-			log.Debugf(
+			log.Infof(
 				"validate proposer sig finished successfully, proposer sig: %x, bls sig: %x, pubkey: %x",
 				proposerSig,
 				blsSig,
@@ -307,7 +307,7 @@ func (pos *Pos) ValidateProposerSig(
 			)
 			return true
 		} else {
-			log.Debugf(
+			log.Infof(
 				"validate proposer sig failed, err: %v, proposer sig: %x, bls sig: %x, pubkey: %x",
 				err,
 				proposerSig,
@@ -336,7 +336,7 @@ func (pos *Pos) ValidateBLSSig(
 	}
 
 	if !pos.IsVSSReady() {
-		log.Debugf("validate bls sig failed, bls is not ready")
+		log.Infof("validate bls sig failed, bls is not ready")
 		return false
 	}
 
@@ -348,13 +348,13 @@ func (pos *Pos) ValidateBLSSig(
 		blsSig,
 	)
 	if errVerify != nil {
-		log.Debugf(
+		log.Infof(
 			"vss validate bls sig failed, sig not verify with current bls, h = %x, s = %x",
 			toSign,
 			blsSig,
 		)
 	} else {
-		log.Debugf("vss validate bls sig ok")
+		log.Infof("vss validate bls sig ok")
 		return true
 	}
 
@@ -371,13 +371,13 @@ func (pos *Pos) ValidateBLSSig(
 				blsSig,
 			)
 			if errVerify != nil {
-				log.Debugf(
+				log.Infof(
 					"vss validate bls sig failed, sig not verify with prev bls, h = %x, s = %x",
 					toSign,
 					blsSig,
 				)
 			} else {
-				log.Debugf(
+				log.Infof(
 					"vss validate bls sig ok with prev bls, h = %x, s = %x",
 					toSign,
 					blsSig,
@@ -398,6 +398,7 @@ func (pos *Pos) HandleSigShares() {
 	for {
 		sigShare := <-pos.Vss.SigShareChan
 		sigShareKey := sigShare.Key()
+		log.Infof("---------------- receive sigShare: %s", sigShare.Key())
 
 		if _, ok := allSigShares[sigShareKey]; !ok {
 			allSigShares[sigShareKey] = make(map[int][]byte)
@@ -429,7 +430,7 @@ func (pos *Pos) HandleSigShares() {
 				sigs,
 			)
 			if err == nil {
-				log.Debugf(
+				log.Infof(
 					"vss Sigs verified: %s, %x",
 					string(vssResult.ToSign),
 					vssResult.Sig,
@@ -448,8 +449,8 @@ func (pos *Pos) HandleSigShares() {
 	}
 }
 
-func (pos *Pos) LoadVSSKey() {
-	vsskeyBytes := keystore.GetVSSKey(common.HexToAddress(pos.vnodeconfig.VssBaseAddr))
+func GetOrCreateVSSKey(vssBaseAddr common.Address) *VSSKey {
+	vsskeyBytes := keystore.GetVSSKey(vssBaseAddr)
 	vsskey := &VSSKey{}
 	if len(vsskeyBytes) == 0 {
 		vsskey = GenerateVSSKey()
@@ -457,10 +458,8 @@ func (pos *Pos) LoadVSSKey() {
 		// store the vss key in db
 		pVSSKey := ToPersistVSSKey(vsskey)
 		data, _ := json.Marshal(pVSSKey)
-		log.Debugf("vss can not find vss key & generated new one: %s", string(data))
-		if err := keystore.PutVSSKey(
-			common.HexToAddress(pos.vnodeconfig.VssBaseAddr), data,
-		); err != nil {
+		log.Infof("vss can not find vss key & generated new one: %s", string(data))
+		if err := keystore.PutVSSKey(vssBaseAddr, data); err != nil {
 			log.Errorf("vss key can not be stored: %v", err)
 		}
 
@@ -474,11 +473,17 @@ func (pos *Pos) LoadVSSKey() {
 		privatekey.UnmarshalFrom(bytes.NewReader(pVSSKey.Private))
 		vsskey.Public = publickey
 		vsskey.Private = privatekey
-		log.Debugf("loaded vss key from db: %s", string(vsskeyBytes))
+		log.Infof("loaded vss key from db: %s", string(vsskeyBytes))
 	}
 
+	return vsskey
+}
+
+func (pos *Pos) LoadVSSKey() *VSSKey {
+	vsskey := GetOrCreateVSSKey(common.HexToAddress(pos.vnodeconfig.VssBaseAddr))
 	pos.VssKey = vsskey
-	log.Debugf("load vsskey as: %v", vsskey)
+	log.Infof("load vsskey as: %v", vsskey)
+	return vsskey
 }
 
 func (pos *Pos) NewVnodeBlockLoop() {
@@ -487,7 +492,7 @@ func (pos *Pos) NewVnodeBlockLoop() {
 	if interval < params.MinVSSRunInterval {
 		interval = params.MinVSSRunInterval
 	}
-	log.Debugf("New vnode block loop, run every %d seconds", interval)
+	log.Infof("New vnode block loop, run every %d seconds", interval)
 	t := time.NewTicker(time.Duration(int(interval)) * time.Second)
 	defer t.Stop()
 	defer log.Infof("new vnode block loop exits")
@@ -495,7 +500,7 @@ func (pos *Pos) NewVnodeBlockLoop() {
 	for {
 		<-t.C
 		currentVnodeBlockNumber, _ := pos.client.BlockNumber(context.Background())
-		log.Debugf("new vnode block loop block number = %d", currentVnodeBlockNumber)
+		log.Infof("new vnode block loop block number = %d", currentVnodeBlockNumber)
 		if currentVnodeBlockNumber > lastBlock {
 			SlowNodeChan <- currentVnodeBlockNumber
 			RevealedShareChan <- currentVnodeBlockNumber
@@ -725,6 +730,7 @@ func (pos *Pos) UpdateVSSConfig() int {
 	log.Debugf("vss updateVssConfig")
 	vssConfigVersion := pos.GetVssConfigVersion()
 	activeNodeList, listErr := pos.GetActiveVSSMemberList()
+	pos.NodeList = activeNodeList
 	addressToIndex := pos.GetVSSNodesIndexs(activeNodeList)
 	pos.AddressToIndex = make(map[string]int)
 	pos.IndexToAddress = make(map[int]string)
@@ -755,7 +761,7 @@ func (pos *Pos) UpdateVSSConfig() int {
 	pos.nodesPubkey, _ = pos.GetVSSNodesPubkey(activeNodeList)
 	// if vss in subchainbase is not yet finished setting up.
 	if len(activeNodeList) < int(threshold) {
-		log.Errorf("vss not enough active nodes")
+		log.Errorf("vss not enough active nodes: %d < threshold %d", len(activeNodeList), int(threshold))
 		return VssConfigRecheck
 	}
 
@@ -1167,15 +1173,16 @@ func (pos *Pos) UploadVSSConfig(forceUpdate bool) error {
 	// send request to contract at contractAddress.
 	// return a list of active vss nodes addresses (address[])
 	activeNodeList, listErr := pos.GetActiveVSSMemberList()
+	pos.NodeList = activeNodeList
 	if listErr != nil {
-		log.Debugf("in UploadVSSConfig() return with error: %v", listErr)
+		log.Errorf("in UploadVSSConfig() return with error: %v", listErr)
 		return listErr
 	}
 	threshold := pos.GetVssThreshold()
 
 	// if we don't need to upload, just return
 	if ret, _err := pos.ShouldUploadVSSConfig(activeNodeList, int(threshold), forceUpdate); !ret {
-		log.Debugf("in UploadVSSConfig() no need to upload vss config, forceUpdate: %t, reason: %v",
+		log.Infof("in UploadVSSConfig() no need to upload vss config, forceUpdate: %t, reason: %v",
 			forceUpdate,
 			_err,
 		)

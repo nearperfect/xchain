@@ -32,6 +32,7 @@ var iv = []byte{
 	0x7A, 0x3D, 0x5F, 0x06, 0x41, 0x9B, 0x3F, 0x2D,
 }
 
+var passphraceFileName = "passphrace"
 var XBasePath = ""
 
 func SetXBasePath(prefix string) {
@@ -96,7 +97,7 @@ func SaveXPassphrace(passphrase string) error {
 	stat, err = os.Stat(XBasePath)
 
 	if err == nil && stat.IsDir() {
-		filepath := filepath.Join(XBasePath, "Info")
+		filepath := filepath.Join(XBasePath, passphraceFileName)
 		err = ioutil.WriteFile(filepath, []byte(encrypt), os.ModePerm)
 		if err != nil {
 			log.Error("write file err")
@@ -108,13 +109,13 @@ func SaveXPassphrace(passphrase string) error {
 	}
 
 	return errors.New(
-		"Basepath error: Either not exist or is a file. Please remove the file and try again!",
+		"Basepath error: Either nots exist or is a file. Please remove the file and try again!",
 	)
 }
 
 //Get the passphrace from file
 func GetXPassphrace() string {
-	filepath := filepath.Join(XBasePath, "Info")
+	filepath := filepath.Join(XBasePath, passphraceFileName)
 	fd, err := os.OpenFile(filepath, os.O_APPEND, os.ModePerm)
 	if err != nil {
 		log.Errorf("GetPassphrace() open file error: %v", err)
@@ -191,7 +192,7 @@ func GetOrCreateXKeyStore() (*KeyStoreInfo, error) {
 	)
 	// Create base path
 	os.MkdirAll(XBasePath, os.ModePerm)
-	log.Infof("basepath: %v", XBasePath)
+	log.Infof("XBasepath: %v", XBasePath)
 
 	path, err := scanXKeyFile()
 	if err != nil {
@@ -257,18 +258,18 @@ func GetXDecryptedKey(a accounts.Account, passphrase string) (accounts.Account, 
 // Vss key section
 ////////////////////////////
 
-func vssKeyFileName(subChainAddr common.Address) string {
-	return filepath.Join(XBasePath, fmt.Sprintf("%x.vsskey", subChainAddr))
+func vssKeyFileName(vssBaseAddr common.Address) string {
+	return filepath.Join(XBasePath, fmt.Sprintf("%x.vsskey", vssBaseAddr))
 }
 
-func GetVSSKey(subChainAddr common.Address) []byte {
-	keyFile := vssKeyFileName(subChainAddr)
+func GetVSSKey(vssBaseAddr common.Address) []byte {
+	keyFile := vssKeyFileName(vssBaseAddr)
 	content, _ := ioutil.ReadFile(keyFile)
 	return content
 }
 
-func PutVSSKey(subChainAddr common.Address, data []byte) error {
-	keyFile := vssKeyFileName(subChainAddr)
+func PutVSSKey(vssBaseAddr common.Address, data []byte) error {
+	keyFile := vssKeyFileName(vssBaseAddr)
 	err := ioutil.WriteFile(keyFile, data, 0644)
 	return err
 }

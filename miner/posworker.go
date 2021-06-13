@@ -88,7 +88,7 @@ func NewWorker(
 	mc Backend,
 	mux *event.TypeMux,
 ) *worker {
-	log.Debugf("create new chain worker")
+	log.Infof("create new chain worker")
 	worker := &worker{
 		config:           config,
 		mux:              mux,
@@ -235,7 +235,13 @@ func (worker *worker) blockGenBLSBeacon() {
 func (worker *worker) getProposer(block *types.Block, epoch int64) common.Address {
 	// get the random number based on bls signature from head block and epoch
 	extraData, _ := block.Header().ExtraData()
-	blssig := (*extraData)[params.BLSSigField]
+	var blssig []byte
+	// if it's the genesis block
+	if block.Number().Int64() == 0 {
+		blssig = make([]byte, 32, 32)
+	} else {
+		blssig = (*extraData)[params.BLSSigField]
+	}
 	rounds := 100
 	seed256 := sha256.Sum256([]byte(fmt.Sprintf("%x,%d", blssig, epoch)))
 	for i := 0; i < rounds; i++ {
@@ -246,6 +252,7 @@ func (worker *worker) getProposer(block *types.Block, epoch int64) common.Addres
 
 	// sort the nodelist
 	nodelist := worker.pos.NodeList
+	log.Infof("worker.pos.NodeList: %d", len(worker.pos.NodeList))
 	nodelistSorted := []string{}
 	for _, node := range nodelist {
 		nodelistSorted = append(nodelistSorted, fmt.Sprintf("%s", node.Bytes()))
@@ -296,19 +303,22 @@ func (worker *worker) genSigShare(epoch int64) pos.SigShareMessage {
 }
 
 func (worker *worker) sendSigShare(sigShare *pos.SigShareMessage) error {
+	log.Infof("------------------- begin send sigshare: %v", sigShare)
 	// broadcast to other peers
-	worker.mux.Post(core.NewSigShareEvent{SigShare: sigShare})
+	//err := worker.mux.Post(core.NewSigShareEvent{SigShare: sigShare})
 	// send one to self by directly sending to the channel
+	log.Infof("--------------------mid mux send sigShare, err: %v", nil)
 	worker.pos.Vss.SigShareChan <- sigShare
+	log.Infof("------------------- end send sigshare: %s", sigShare.Key())
 	return nil
 }
 
 func (worker *worker) blockGenBLS(sigShareMessage pos.SigShareMessage) {
 	if worker.pos.IsVSSReady() {
 		//commitNewWorkTime := int(time.Now().Unix())
-		log.Debugf("Generate new block vss, current head: %d", worker.chain.CurrentBlock())
+		log.Infof("Generate new block vss, current head: %d", worker.chain.CurrentBlock())
 		work := worker.commitNewWork(&sigShareMessage)
-		log.Debugf("after commitNewWork() vss: work = %v", work)
+		log.Infof("after commitNewWork() vss: work = %v", work)
 		var block *types.Block
 		if work != nil {
 			if block = worker.GenBlock(work); block != nil {
@@ -337,23 +347,23 @@ func (worker *worker) tryBlockGenBLS(sigShareMessage pos.SigShareMessage) {
 	// todo: use trylock once golang supports it in mutex
 	worker.blockGenRunning = true
 	defer func() {
-		log.Debugf("in tryblockgenbls(), end block generation")
+		log.Infof("in tryblockgenbls(), end block generation")
 		worker.blockGenRunning = false
 	}()
 
-	log.Debugf("in tryblockgenbls(), begin block generation")
+	log.Infof("in tryblockgenbls(), begin block generation")
 	if !worker.pos.IsConsensus() {
-		log.Debugf("vss scs not in consensus group, will continue")
+		log.Infof("vss scs not in consensus group, will continue")
 		return
 	} else {
-		log.Debugf("vss scs in consensus group, will participate")
+		log.Infof("vss scs in consensus group, will participate")
 	}
 
 	// if I'm proposer, I should collect all sigs and generate the block
 	// otherwise no-op
 	proposer := common.BytesToAddress(sigShareMessage.ForProposer)
 	if proposer == worker.pos.Vssid {
-		log.Debugf(
+		log.Infof(
 			"I am the proposer vss %s, self: %x, proposer: %x",
 			sigShareMessage.Key(),
 			worker.pos.Vssid.Bytes(),
@@ -361,7 +371,7 @@ func (worker *worker) tryBlockGenBLS(sigShareMessage pos.SigShareMessage) {
 		)
 		worker.blockGenBLS(sigShareMessage)
 	} else {
-		log.Debugf(
+		log.Infof(
 			"I am NOT the proposer vss %s, self: %x, proposer: %x",
 			sigShareMessage.Key(),
 			worker.pos.Vssid.Bytes(),
@@ -375,6 +385,11 @@ func (worker *worker) blockGenBLSLoop() {
 		select {
 		case epoch := <-worker.blockGenEpochBLS:
 			if worker.pos.IsVSSReady() {
+				log.Infof(
+					"gen bls block, current block: %d, %x",
+					worker.chain.CurrentBlock().Number(),
+					worker.chain.CurrentBlock().Hash().Bytes()[:8],
+				)
 				sigShareMessage := worker.genSigShare(epoch)
 				// broadcast sig shares at the begining of every epoch
 				go worker.sendSigShare(&sigShareMessage)
@@ -412,7 +427,7 @@ func (worker *worker) update() {
 					newwait = (worker.pos.Position - loc) * int(xparams.BlockInterval)
 				}
 				// now reset block gen timer
-				log.Debugf(
+				log.Infof(
 					"blockGenTimerCh UpdateTimer:Position: %v, newwait: %v",
 					worker.pos.Position,
 					newwait,
@@ -513,7 +528,7 @@ func (worker *worker) commitNewWork(sigShareMessage *pos.SigShareMessage) *Work 
 	// this will ensure we're not going off too far in the future
 	if now := time.Now().Unix(); tstamp > now+1 {
 		wait := time.Duration(tstamp-now) * time.Second
-		log.Debug("Mining too far in the future", "wait", common.PrettyDuration(wait))
+		log.Info("Mining too far in the future", "wait", common.PrettyDuration(wait))
 		time.Sleep(wait)
 	}
 
@@ -524,8 +539,8 @@ func (worker *worker) commitNewWork(sigShareMessage *pos.SigShareMessage) *Work 
 		Time:       big.NewInt(tstamp),
 	}
 	header.Coinbase = worker.pos.Vssid
-	log.Debugf("commitNewWork parent num: %d, parent hash %x", num, header.ParentHash.Bytes())
-	log.Debugf("engine type: %v", reflect.TypeOf(worker.chain.Engine()))
+	log.Infof("commitNewWork parent num: %d, parent hash %x", num, header.ParentHash.Bytes())
+	log.Infof("engine type: %v", reflect.TypeOf(worker.chain.Engine()))
 
 	// make new work
 	work, err := worker.makeNewWork(parent, header)
@@ -547,9 +562,9 @@ func (worker *worker) commitNewWork(sigShareMessage *pos.SigShareMessage) *Work 
 	if !worker.pos.ShouldSkipVSS(header.Number.Int64()) {
 		var err error
 		blsSig, err = worker.pos.GetBlsSig(sigShareMessage.Key())
-		log.Debugf("vss bls sig: %x, %v", blsSig, err)
+		log.Infof("vss bls sig = [%x], err: %v", blsSig, err)
 		if err != nil {
-			log.Debugf("Failed to get vss bls sig")
+			log.Infof("Failed to get vss bls sig")
 			return nil
 		}
 

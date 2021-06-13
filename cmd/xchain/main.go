@@ -93,7 +93,6 @@ var (
 		utils.MoacbaseFlag,
 		utils.GasPriceFlag,
 		utils.MinerThreadsFlag,
-		utils.MiningEnabledFlag,
 		utils.TargetGasLimitFlag,
 		utils.NATFlag,
 		utils.NoDiscoverFlag,
@@ -296,27 +295,26 @@ func startNode(ctx *cli.Context, node *node.Node) {
 			}
 		}
 	}()
-	// Start auxiliary services if enabled
-	if ctx.GlobalBool(utils.MiningEnabledFlag.Name) {
-		// Mining only makes sense if a full MoacService node is running
-		// get the running instance of moacservice inside node and assign it to moac
-		var moacServ *mc.MoacService
-		if err := node.Service(&moacServ); err != nil {
-			utils.Fatalf("moac service not running: %v", err)
+
+	// Start minging
+	// Mining only makes sense if a full MoacService node is running
+	// get the running instance of moacservice inside node and assign it to moac
+	var moacServ *mc.MoacService
+	if err := node.Service(&moacServ); err != nil {
+		utils.Fatalf("moac service not running: %v", err)
+	}
+	// Use a reduced number of threads if requested
+	if threads := ctx.GlobalInt(utils.MinerThreadsFlag.Name); threads > 0 {
+		type threaded interface {
+			SetThreads(threads int)
 		}
-		// Use a reduced number of threads if requested
-		if threads := ctx.GlobalInt(utils.MinerThreadsFlag.Name); threads > 0 {
-			type threaded interface {
-				SetThreads(threads int)
-			}
-			if th, ok := moacServ.Engine().(threaded); ok {
-				th.SetThreads(threads)
-			}
+		if th, ok := moacServ.Engine().(threaded); ok {
+			th.SetThreads(threads)
 		}
-		// Set the gas price to the limits from the CLI and start mining
-		moacServ.TxPool().SetGasPrice(utils.GlobalBig(ctx, utils.GasPriceFlag.Name))
-		if err := moacServ.StartMining(true); err != nil {
-			utils.Fatalf("Failed to start mining: %v", err)
-		}
+	}
+	// Set the gas price to the limits from the CLI and start mining
+	moacServ.TxPool().SetGasPrice(utils.GlobalBig(ctx, utils.GasPriceFlag.Name))
+	if err := moacServ.StartMining(true); err != nil {
+		utils.Fatalf("Failed to start mining: %v", err)
 	}
 }

@@ -79,7 +79,7 @@ func DialHTTP(endpoint string) (*Client, error) {
 }
 
 func (c *Client) sendHTTP(ctx context.Context, op *requestOp, msg interface{}) error {
-	log.Infof("[rpc/http.go->Client.sendHTTP] %v", msg)
+	log.Debugf("[rpc/http.go->Client.sendHTTP] %v", msg)
 	hc := c.writeConn.(*httpConn)
 	respBody, err := hc.doRequest(ctx, msg)
 	if err != nil {

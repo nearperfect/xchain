@@ -20,14 +20,18 @@ import (
 	"fmt"
 	"io/ioutil"
 
+	"gopkg.in/urfave/cli.v1"
+
+	"github.com/MOACChain/MoacLib/common"
 	"github.com/MOACChain/MoacLib/crypto"
 	"github.com/MOACChain/MoacLib/log"
 	"github.com/MOACChain/xchain/accounts"
 	"github.com/MOACChain/xchain/accounts/keystore"
 	"github.com/MOACChain/xchain/cmd/utils"
+	"github.com/MOACChain/xchain/consensus/pos"
 	"github.com/MOACChain/xchain/console"
-
-	"gopkg.in/urfave/cli.v1"
+	"github.com/MOACChain/xchain/mc"
+	vnodeconfig "github.com/MOACChain/xchain/vnode/config"
 )
 
 var (
@@ -144,6 +148,7 @@ password to file or expose in any other way.
 					utils.DataDirFlag,
 					utils.KeyStoreDirFlag,
 					utils.PasswordFileFlag,
+					utils.XchainPasswordFlag,
 				},
 				Description: `Create a new xchain account`,
 			},
@@ -227,19 +232,45 @@ func accountListX(ctx *cli.Context) error {
 	datadir := utils.MakeDataDir(ctx)
 	keystore.SetXBasePath(datadir)
 	ks := keystore.NewKeyStore(keystore.XBasePath, keystore.StandardScryptN, keystore.StandardScryptP)
+
+	// get pubkey
+	vnodeConfig, _ := vnodeconfig.GetConfiguration(mc.DefaultConfig.VnodeConfigPath)
+	vsskey := pos.GetOrCreateVSSKey(common.HexToAddress(vnodeConfig.VssBaseAddr))
+	vsskeyPersist := pos.ToPersistVSSKey(vsskey)
+	// get account
 	for index, account := range ks.Accounts() {
-		fmt.Printf("Account #%d: {0x%x}\n", index, account.Address)
+		fmt.Printf(
+			"Account #%d: {0x%x}, pubkey: 0x%x\n",
+			index, account.Address, vsskeyPersist.Public[:32],
+		)
 	}
 	return nil
 }
 
 // accountCreate creates a new account into the keystore defined by the CLI flags.
 func accountCreateX(ctx *cli.Context) error {
+	// init dir correctly
 	datadir := utils.MakeDataDir(ctx)
 	keystore.SetXBasePath(datadir)
+
+	// prepare passphrace
+	passphrace := utils.XchainPassphrace
+	if ctx.GlobalIsSet(utils.XchainPasswordFlag.Name) {
+		passphrace = utils.XchainPasswordFlag.Name
+	}
+	if err := keystore.SaveXPassphrace(passphrace); err != nil {
+		log.Errorf("SavePassphrace() err: %v", err)
+	}
+
+	// create pubkey
+	vnodeConfig, _ := vnodeconfig.GetConfiguration(mc.DefaultConfig.VnodeConfigPath)
+	vsskey := pos.GetOrCreateVSSKey(common.HexToAddress(vnodeConfig.VssBaseAddr))
+	vsskeyPersist := pos.ToPersistVSSKey(vsskey)
+
+	//create account
 	ks := keystore.NewKeyStore(keystore.XBasePath, keystore.StandardScryptN, keystore.StandardScryptP)
 	if len(ks.Accounts()) > 0 {
-		fmt.Printf("XChain Account exist already. There should be only one XChain account\n")
+		fmt.Printf("XChain Account exists already. There should be only one XChain account\n")
 		return nil
 	} else {
 		keystore.GetOrCreateXKeyStore()
@@ -247,7 +278,10 @@ func accountCreateX(ctx *cli.Context) error {
 	fmt.Printf("XChain account created:\n")
 	ks = keystore.NewKeyStore(keystore.XBasePath, keystore.StandardScryptN, keystore.StandardScryptP)
 	for index, account := range ks.Accounts() {
-		fmt.Printf("Account #%d: {0x%x}\n", index, account.Address)
+		fmt.Printf(
+			"Account #%d: {0x%x}, pubkey: 0x%x\n",
+			index, account.Address, vsskeyPersist.Public[:32],
+		)
 	}
 	return nil
 }

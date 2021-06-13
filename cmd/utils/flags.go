@@ -56,7 +56,7 @@ import (
 )
 
 const (
-	xchainPassphrace = "xchaindefaultphrace"
+	XchainPassphrace = "xchaindefaultphrace"
 )
 
 var (
@@ -259,10 +259,6 @@ var (
 		Value: int(state.MaxTrieCacheGen),
 	}
 	// Miner settings
-	MiningEnabledFlag = cli.BoolFlag{
-		Name:  "mine",
-		Usage: "Enable mining",
-	}
 	MinerThreadsFlag = cli.IntFlag{
 		Name:  "minerthreads",
 		Usage: "Number of CPU threads to use for mining",
@@ -301,7 +297,7 @@ var (
 	XchainPasswordFlag = cli.StringFlag{
 		Name:  "xchainpassword",
 		Usage: "Password for xchain node keystore",
-		Value: xchainPassphrace,
+		Value: XchainPassphrace,
 	}
 	VMEnableDebugFlag = cli.BoolFlag{
 		Name:  "vmdebug",
@@ -703,7 +699,7 @@ func setXchainBase(ctx *cli.Context, cfg *mc.Config) {
 	datadir := MakeDataDir(ctx)
 	keystore.SetXBasePath(datadir)
 
-	passphrace := xchainPassphrace
+	passphrace := XchainPassphrace
 	if ctx.GlobalIsSet(XchainPasswordFlag.Name) {
 		passphrace = XchainPasswordFlag.Name
 	}

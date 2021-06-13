@@ -80,6 +80,10 @@ func New(cfg *config.Configuration, vssid common.Address, key *keystore.Key) *Po
 		key.PrivateKey,
 		big.NewInt(int64(cfg.ChainId)),
 	)
+	vss := &VSS{
+		VSSNodeChan:  make(chan *VSSNode, 10),
+		SigShareChan: make(chan *SigShareMessage, 10),
+	}
 	pos := &Pos{
 		vssEnabled:     true,
 		client:         client,
@@ -92,27 +96,25 @@ func New(cfg *config.Configuration, vssid common.Address, key *keystore.Key) *Po
 		AddressToIndex: make(map[string]int),
 		IndexToAddress: make(map[int]string),
 		Vssid:          vssid,
+		Vss:            vss,
+		prevbls:        list.New(),
+		AllSigs:        gocache.New(60*time.Minute, 90*time.Minute),
 	}
+
+	// update node list
+	nodeList, _ := pos.GetActiveVSSMemberList()
+	pos.NodeList = nodeList
 
 	// vss config loop
 	if pos.vssEnabled {
 		log.Debugf("vss enabled, ready to run vss loop")
 		// init vsskey
 		pos.LoadVSSKey()
-		if pos.IsActiveVss() {
-			pos.registerVss()
-			pos.activateVss()
-			time.Sleep(30 * time.Second)
-		}
-
-		if pos.IsActiveVss() {
-			go pos.VssStateLoop()        // for updating config
-			go pos.VssSlashingLoop()     // for checking slash
-			go pos.VssUploadConfigLoop() // for uploading config
-			go pos.NewVnodeBlockLoop()   // for checking new block in vnode
-		} else {
-			log.Infof("--------------------------    no vss loop")
-		}
+		go pos.HandleSigShares()     // handle sig shares
+		go pos.VssStateLoop()        // for updating config
+		go pos.VssUploadConfigLoop() // for uploading config
+		go pos.NewVnodeBlockLoop()   // for checking new block in vnode
+		//go pos.VssSlashingLoop()     // for checking slash
 	}
 
 	return pos
