@@ -30,8 +30,10 @@ import (
 
 // Constants to match up protocol versions and messages
 const (
-	mc62 = 10062
-	mc63 = 10063
+	mc62        = 10062
+	mc63        = 10063
+	MinProtocol = mc62
+	MaxProtocol = mc63
 )
 
 // Official short name of the protocol used during capability negotiation.

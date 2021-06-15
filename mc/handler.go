@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
+	//"math"
 	"math/big"
 	"strings"
 	"sync"
@@ -43,6 +43,7 @@ import (
 	"github.com/MOACChain/xchain/node"
 	"github.com/MOACChain/xchain/p2p"
 	"github.com/MOACChain/xchain/p2p/discover"
+	xparams "github.com/MOACChain/xchain/params"
 	"github.com/MOACChain/xchain/sentinel"
 	gocache "github.com/patrickmn/go-cache"
 )
@@ -225,9 +226,14 @@ func NewProtocolManager(
 		log.Warn("Blockchain not empty, fast sync disabled")
 		mode = downloader.FullSync
 	}
-	if mode == downloader.FastSync {
-		manager.fastSync = uint32(1)
-	}
+
+	// hard code to be full sync for now
+	manager.fastSync = uint32(0)
+	/*
+		if mode == downloader.FastSync {
+			manager.fastSync = uint32(1)
+		}*/
+
 	// Initiate a sub-protocol for every implemented version we can handle
 	manager.SubProtocols = make([]p2p.Protocol, 0, len(ProtocolVersions))
 	for i, version := range ProtocolVersions {
@@ -279,10 +285,12 @@ func NewProtocolManager(
 	}
 
 	// Construct the different synchronisation mechanisms
-	manager.downloader = downloader.New(mode, chaindb, manager.eventMux, blockchain, nil, manager.removePeer)
-
+	syncBlock := false
+	manager.downloader = downloader.New(
+		mode, chaindb, manager.eventMux, blockchain, nil, manager.removePeer,
+	)
 	validator := func(header *types.Header) error {
-		return engine.VerifyHeader(blockchain, header, true)
+		return engine.VerifyHeader(blockchain, header, true, syncBlock)
 	}
 	heighter := func() uint64 {
 		return blockchain.CurrentBlock().NumberU64()
@@ -290,12 +298,15 @@ func NewProtocolManager(
 	inserter := func(blocks types.Blocks) (int, error) {
 		// If fast sync is running, deny importing weird blocks
 		if atomic.LoadUint32(&manager.fastSync) == 1 {
-			log.Warn("Discarded bad propagated block", "number", blocks[0].Number(), "hash", blocks[0].Hash())
+			log.Warn(
+				"Discarded bad propagated block",
+				"number", blocks[0].Number(), "hash", blocks[0].Hash(),
+			)
 			return 0, nil
 		}
 		atomic.StoreUint32(&manager.acceptTxs, 1) // Mark initial sync done on any fetcher import
 		liveFlag := false
-		return manager.blockchain.InsertChain(blocks, liveFlag)
+		return manager.blockchain.InsertChain(blocks, liveFlag, syncBlock)
 	}
 	manager.fetcher = fetcher.New(blockchain.GetBlockByHash, validator, manager.BroadcastBlock, heighter, inserter, manager.removePeer)
 
@@ -358,6 +369,7 @@ func (pm *ProtocolManager) Start(maxPeers int) {
 	pm.minedBlockSub = pm.eventMux.Subscribe(core.NewMinedBlockEvent{})
 	pm.sigShareSub = pm.eventMux.Subscribe(core.NewSigShareEvent{})
 	go pm.minedBroadcastLoop()
+	go pm.sigShareBroadcastLoop()
 
 	// start sync handlers
 	go pm.syncer()
@@ -811,19 +823,6 @@ func (pm *ProtocolManager) handleSubnetMsg(p *Peer, msg p2p.Msg) error {
 			}
 			pm.NetworkRelay.BroadcastMsg(&scsMsg, forceToMainnet)
 		*/
-
-	case msg.Code == VaultEventMsg:
-		log.Infof("  vault event received !!!!!!!!!!!!!!")
-		var vaultEvents []*core.VaultEvent
-		// Parse all vault events
-		if err := msg.Decode(&vaultEvents); err != nil {
-			return ErrResp(ErrDecode, "vault events msg parse error: %v: %v", msg, err)
-		}
-
-		for _, event := range vaultEvents {
-			p.MarkVaultEvent(event.Hash())
-		}
-
 	case msg.Code == TxMsg:
 		var txs, txsShard []*types.Transaction
 		// Transactions can be processed, parse all of them and deliver to the pool
@@ -1133,6 +1132,7 @@ func (pm *ProtocolManager) handleMainnetMsg(p *Peer, msg p2p.Msg) error {
 		}
 
 	case msg.Code == NewBlockMsg:
+		log.Infof("  new block received ++++++++++++++++")
 		// Retrieve and decode the propagated block
 		var request newBlockData
 		if err := msg.Decode(&request); err != nil {
@@ -1160,7 +1160,8 @@ func (pm *ProtocolManager) handleMainnetMsg(p *Peer, msg p2p.Msg) error {
 			// scenario should easily be covered by the fetcher.
 			currentBlock := pm.blockchain.CurrentBlock()
 			if trueTD.Cmp(pm.blockchain.GetTd(currentBlock.Hash(), currentBlock.NumberU64())) > 0 {
-				go pm.synchronise(p)
+				ignoreTD := false
+				go pm.synchronise(p, ignoreTD)
 			}
 		}
 
@@ -1208,17 +1209,35 @@ func (pm *ProtocolManager) handleMainnetMsg(p *Peer, msg p2p.Msg) error {
 		}
 
 	case msg.Code == SigShareMsg:
-		log.Infof("  sig share received !!!!!!!!!!!!!!")
 		var sigShares []*pos.SigShareMessage
 		// Parse all vault events
 		if err := msg.Decode(&sigShares); err != nil {
 			return ErrResp(ErrDecode, "sig shares msg parse error: %v: %v", msg, err)
 		}
 
-		for _, sigShare := range sigShares {
-			pos := pm.engine.(pos.Pos)
+		var sigShare *pos.SigShareMessage
+		for _, sigShare = range sigShares {
+			pos := pm.engine.(*pos.Pos)
 			pos.Vss.SigShareChan <- sigShare
 			p.MarkSigShare(sigShare.Hash())
+			log.Infof("  sig share received !!!!!!!!!!!!! %s", sigShare.Key())
+		}
+
+		// force sync if last sigshare's remote peer has higher block
+		currentBlock := pm.blockchain.CurrentBlock()
+		remotePeerBlockNumber := sigShare.BlockNumber.Int64() - 1
+		remotePeerDifficulty := new(big.Int).Add(
+			xparams.PosBaseDifficulty,
+			new(big.Int).Mul(xparams.PosDifficultyPerBlock, big.NewInt(remotePeerBlockNumber)),
+		)
+		p.SetHead(common.BytesToHash(sigShare.BlockHash), remotePeerDifficulty)
+		log.Infof(
+			"  sig share peer sethead !!!!!!!!!!!!! peer.id: %v, hash: %x, TD: %d, blockNumber: %d",
+			p.id, sigShare.BlockHash[:8], remotePeerDifficulty, big.NewInt(remotePeerBlockNumber),
+		)
+		if remotePeerBlockNumber-currentBlock.Number().Int64() > 1 {
+			ignoreTD := false
+			go pm.synchronise(p, ignoreTD)
 		}
 
 	case msg.Code == ScsMsg:
@@ -1281,7 +1300,8 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 			return
 		}
 		// Send the block to a subset of our peers
-		transfer := peers[:int(math.Sqrt(float64(len(peers))))]
+		//transfer := peers[:int(math.Sqrt(float64(len(peers))))]
+		transfer := peers
 		for _, peer := range transfer {
 			peer.AsyncSendNewBlock(block, td)
 		}

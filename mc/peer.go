@@ -111,6 +111,7 @@ func newPeer(version int, p *p2p.Peer, rw p2p.MsgReadWriter) *Peer {
 		knownBlocks:       set.New(),
 		knownMsgs:         set.New(),
 		knownVaultEvents:  set.New(),
+		knownSigShares:    set.New(),
 		queuedTxs:         make(chan types.Transactions, maxQueuedTxs),
 		queuedVaultEvents: make(chan core.VaultEvents, maxQueuedVaultEvents),
 		queuedSigShares:   make(chan core.SigShares, maxQueuedSigShares),
@@ -272,7 +273,6 @@ func (p *Peer) SendSigShares(sigShares core.SigShares) error {
 		p.knownSigShares.Add(sigShare.Hash())
 	}
 
-	log.Debugf("p2p send sig share for %s", p.subnet)
 	return p2p.Send(p.rw, SigShareMsg, sigShares)
 }
 

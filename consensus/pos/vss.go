@@ -77,7 +77,7 @@ var (
 
 func (pos *Pos) IsVSSReady() bool {
 	ret := pos.vssEnabled && pos.Bls != nil && pos.Bls.GroupPrivateShare != nil
-	log.Infof("--------------------------- IsVSSReady: %t", ret)
+	log.Debugf("--------------------------- IsVSSReady: %t", ret)
 	return ret
 }
 
@@ -112,7 +112,7 @@ func (pos *Pos) GetVSSNodesPubkey(
 	publickeys, _ := pos.vssbase.GetVSSNodesPubkey(pos.callOpts, activeNodeList)
 	for i, addr := range activeNodeList {
 		result[addr] = publickeys[i][:]
-		log.Infof("pub key for addr: %x is %x", addr.Bytes(), publickeys[i])
+		log.Debugf("pub key for addr: %x is %x", addr.Bytes(), publickeys[i])
 		if len(publickeys[i]) == 32 {
 			emptyPubkey++
 		}
@@ -218,7 +218,7 @@ func (pos *Pos) GetVSSShares(
 					io.Copy(bufunzip, zr)
 					vssShares := bufunzip.Bytes()
 					receivedVSSShares[addr] = vssShares
-					log.Infof(
+					log.Debugf(
 						"Received (%v/%v) %v shares: %v, err: %v",
 						len(receivedVSSShares),
 						len(activeNodeList),
@@ -256,7 +256,7 @@ func (pos *Pos) GetVSSShares(
 
 func (pos *Pos) GetBlsSig(sigShareKey string) ([]byte, error) {
 	timeoutInterval := params.BlockInterval
-	log.Infof(
+	log.Debugf(
 		"vss call GetBlsSig() with key: %v, allsigs count: %d",
 		sigShareKey,
 		pos.AllSigs.ItemCount(),
@@ -271,14 +271,14 @@ func (pos *Pos) GetBlsSig(sigShareKey string) ([]byte, error) {
 		time.Sleep(1 * time.Second)
 	}
 
-	log.Infof("Wait for vss result timeout")
+	log.Debugf("Wait for vss result timeout")
 	return []byte{}, fmt.Errorf("wait for vss result timeout")
 }
 
 func (pos *Pos) ValidateProposerSig(
-	proposerSig []byte, proposer common.Address, blsSig []byte, fixBlock bool, blockNumber int64,
+	proposerSig []byte, proposer common.Address, blsSig []byte, syncBlock bool, blockNumber int64,
 ) bool {
-	if fixBlock {
+	if syncBlock {
 		return true
 	}
 
@@ -288,7 +288,7 @@ func (pos *Pos) ValidateProposerSig(
 	}
 
 	if !pos.IsVSSReady() {
-		log.Infof("validate proposer sig failed, bls is not ready")
+		log.Debugf("validate proposer sig failed, bls is not ready")
 		return false
 	}
 
@@ -299,7 +299,7 @@ func (pos *Pos) ValidateProposerSig(
 		pubkey.UnmarshalFrom(bytes.NewReader(pubkeyBytes))
 		validated, err := VerifyED25519(pubkey, blsSig, proposerSig)
 		if validated {
-			log.Infof(
+			log.Debugf(
 				"validate proposer sig finished successfully, proposer sig: %x, bls sig: %x, pubkey: %x",
 				proposerSig,
 				blsSig,
@@ -307,7 +307,7 @@ func (pos *Pos) ValidateProposerSig(
 			)
 			return true
 		} else {
-			log.Infof(
+			log.Debugf(
 				"validate proposer sig failed, err: %v, proposer sig: %x, bls sig: %x, pubkey: %x",
 				err,
 				proposerSig,
@@ -321,23 +321,23 @@ func (pos *Pos) ValidateProposerSig(
 }
 
 func (pos *Pos) ValidateBLSSig(
-	toSign, blsSig []byte, fixBlock bool, blockNumber int64,
-) bool {
+	toSign, blsSig []byte, syncBlock bool, blockNumber int64,
+) (bool, error) {
 	// 1. monitor don't participate in bls sig
 	// 2. when sync, don't validate bls sig since it's likely
 	// we don't have the past bls curve for legacy blocks
-	if fixBlock {
-		return true
+	if syncBlock {
+		return true, nil
 	}
 
 	// for the first n blocks of the chain, we don't validate bls
 	if pos.ShouldSkipVSS(blockNumber) {
-		return true
+		return true, nil
 	}
 
 	if !pos.IsVSSReady() {
-		log.Infof("validate bls sig failed, bls is not ready")
-		return false
+		log.Debugf("validate bls sig failed, bls is not ready")
+		return false, fmt.Errorf("bls is not ready")
 	}
 
 	suite := bn256.NewSuite()
@@ -348,14 +348,14 @@ func (pos *Pos) ValidateBLSSig(
 		blsSig,
 	)
 	if errVerify != nil {
-		log.Infof(
+		log.Debugf(
 			"vss validate bls sig failed, sig not verify with current bls, h = %x, s = %x",
 			toSign,
 			blsSig,
 		)
 	} else {
-		log.Infof("vss validate bls sig ok")
-		return true
+		log.Debugf("vss validate bls sig ok")
+		return true, nil
 	}
 
 	// loop through previous bls to see if the sig verify
@@ -371,39 +371,39 @@ func (pos *Pos) ValidateBLSSig(
 				blsSig,
 			)
 			if errVerify != nil {
-				log.Infof(
+				log.Debugf(
 					"vss validate bls sig failed, sig not verify with prev bls, h = %x, s = %x",
 					toSign,
 					blsSig,
 				)
 			} else {
-				log.Infof(
+				log.Debugf(
 					"vss validate bls sig ok with prev bls, h = %x, s = %x",
 					toSign,
 					blsSig,
 				)
-				return true
+				return true, nil
 			}
 			bls = bls.Next()
 		}
 	}
 
-	return false
+	return false, fmt.Errorf("%v", errVerify)
 }
 
 func (pos *Pos) HandleSigShares() {
 	// blockhash -> nodexindex -> sigshare
-	var allSigShares = make(map[string]map[int][]byte)
+	var allSigShares = make(map[string]map[int64][]byte)
 
 	for {
 		sigShare := <-pos.Vss.SigShareChan
 		sigShareKey := sigShare.Key()
-		log.Infof("---------------- receive sigShare: %s", sigShare.Key())
+		log.Debugf("---------------- receive sigShare: hash: %x, key: %s", sigShare.Hash().Bytes()[:8], sigShare.Key())
 
 		if _, ok := allSigShares[sigShareKey]; !ok {
-			allSigShares[sigShareKey] = make(map[int][]byte)
+			allSigShares[sigShareKey] = make(map[int64][]byte)
 		}
-		allSigShares[sigShareKey][sigShare.FromIndex] = sigShare.Sig
+		allSigShares[sigShareKey][sigShare.FromIndex.Int64()] = sigShare.Sig
 
 		/*
 			// update each node's height
@@ -430,7 +430,7 @@ func (pos *Pos) HandleSigShares() {
 				sigs,
 			)
 			if err == nil {
-				log.Infof(
+				log.Debugf(
 					"vss Sigs verified: %s, %x",
 					string(vssResult.ToSign),
 					vssResult.Sig,
@@ -458,7 +458,7 @@ func GetOrCreateVSSKey(vssBaseAddr common.Address) *VSSKey {
 		// store the vss key in db
 		pVSSKey := ToPersistVSSKey(vsskey)
 		data, _ := json.Marshal(pVSSKey)
-		log.Infof("vss can not find vss key & generated new one: %s", string(data))
+		log.Debugf("vss can not find vss key & generated new one")
 		if err := keystore.PutVSSKey(vssBaseAddr, data); err != nil {
 			log.Errorf("vss key can not be stored: %v", err)
 		}
@@ -473,7 +473,7 @@ func GetOrCreateVSSKey(vssBaseAddr common.Address) *VSSKey {
 		privatekey.UnmarshalFrom(bytes.NewReader(pVSSKey.Private))
 		vsskey.Public = publickey
 		vsskey.Private = privatekey
-		log.Infof("loaded vss key from db: %s", string(vsskeyBytes))
+		log.Debugf("loaded vss key from db")
 	}
 
 	return vsskey
@@ -482,7 +482,7 @@ func GetOrCreateVSSKey(vssBaseAddr common.Address) *VSSKey {
 func (pos *Pos) LoadVSSKey() *VSSKey {
 	vsskey := GetOrCreateVSSKey(common.HexToAddress(pos.vnodeconfig.VssBaseAddr))
 	pos.VssKey = vsskey
-	log.Infof("load vsskey as: %v", vsskey)
+	log.Debugf("load vsskey as: %v", vsskey)
 	return vsskey
 }
 
@@ -492,15 +492,15 @@ func (pos *Pos) NewVnodeBlockLoop() {
 	if interval < params.MinVSSRunInterval {
 		interval = params.MinVSSRunInterval
 	}
-	log.Infof("New vnode block loop, run every %d seconds", interval)
+	log.Debugf("New vnode block loop, run every %d seconds", interval)
 	t := time.NewTicker(time.Duration(int(interval)) * time.Second)
 	defer t.Stop()
-	defer log.Infof("new vnode block loop exits")
+	defer log.Debugf("new vnode block loop exits")
 	lastBlock := uint64(0)
 	for {
 		<-t.C
 		currentVnodeBlockNumber, _ := pos.client.BlockNumber(context.Background())
-		log.Infof("new vnode block loop block number = %d", currentVnodeBlockNumber)
+		log.Debugf("new vnode block loop block number = %d", currentVnodeBlockNumber)
 		if currentVnodeBlockNumber > lastBlock {
 			SlowNodeChan <- currentVnodeBlockNumber
 			RevealedShareChan <- currentVnodeBlockNumber
@@ -516,7 +516,7 @@ func (pos *Pos) NewVnodeBlockLoop() {
 // runs indefinitely and update vss config and update vss config if needed
 func (pos *Pos) VssStateLoop() {
 	log.Debugf("vss state loop, runs on new block")
-	defer log.Infof("vss state loop exits")
+	defer log.Debugf("vss state loop exits")
 	for {
 		<-VssStateChan
 		// download secret shares
@@ -527,7 +527,7 @@ func (pos *Pos) VssStateLoop() {
 // runs indefinitely and upload vss config if needed.
 func (pos *Pos) VssUploadConfigLoop() {
 	log.Debugf("vss upload config loop, runs on new block")
-	defer log.Infof("vss upload config loop exit")
+	defer log.Debugf("vss upload config loop exit")
 	for {
 		<-UploadVSSConfigChan
 		// upload secret shares
@@ -543,7 +543,7 @@ func (pos *Pos) VssSlashingLoop() {
 	// mapping: slash index -> bool
 	slashed := make(map[uint64]bool)
 	log.Debugf("vss slashing loop, runs on new block")
-	defer log.Infof("vss slashing loop exit")
+	defer log.Debugf("vss slashing loop exit")
 
 	for {
 		select {
@@ -569,7 +569,7 @@ func (pos *Pos) VssSlashingLoop() {
 		case <-RevealedShareChan:
 			lastSlashVoted := pos.GetLastSlashVoted()
 			contractRevealIndex := pos.GetRevealIndex()
-			log.Infof(
+			log.Debugf(
 				"-------------------------------  vss slashing loop, lastSlashVoted: %d, contractRevealIndex: %d",
 				lastSlashVoted,
 				contractRevealIndex,
@@ -1182,7 +1182,7 @@ func (pos *Pos) UploadVSSConfig(forceUpdate bool) error {
 
 	// if we don't need to upload, just return
 	if ret, _err := pos.ShouldUploadVSSConfig(activeNodeList, int(threshold), forceUpdate); !ret {
-		log.Infof("in UploadVSSConfig() no need to upload vss config, forceUpdate: %t, reason: %v",
+		log.Debugf("in UploadVSSConfig() no need to upload vss config, forceUpdate: %t, reason: %v",
 			forceUpdate,
 			_err,
 		)

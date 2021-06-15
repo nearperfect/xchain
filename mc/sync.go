@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	forceSyncCycle      = 10 * time.Second // Time interval to force syncs, even if few peers are available
+	forceSyncCycle      = 60 * time.Second // Time interval to force syncs, even if few peers are available
 	minDesiredPeerCount = 5                // Amount of peers desired to start syncing
 
 	// This is the target size for the packs of transactions sent by txsyncLoop.
@@ -148,11 +148,13 @@ func (pm *ProtocolManager) syncer() {
 			if pm.p2pManager.peerSet.Len() < minDesiredPeerCount {
 				break
 			}
-			go pm.synchronise(pm.p2pManager.peerSet.BestPeer())
+			ignoreTD := false
+			go pm.synchronise(pm.p2pManager.peerSet.BestPeer(), ignoreTD)
 
 		case <-forceSync.C:
 			// Force a sync even if not enough peers are present
-			go pm.synchronise(pm.p2pManager.peerSet.BestPeer())
+			ignoreTD := true
+			go pm.synchronise(pm.p2pManager.peerSet.BestPeer(), ignoreTD)
 
 		case <-pm.noMorePeers:
 			return
@@ -161,33 +163,42 @@ func (pm *ProtocolManager) syncer() {
 }
 
 // synchronise tries to sync up our local block chain with a remote Peer.
-func (pm *ProtocolManager) synchronise(peer *Peer) {
+func (pm *ProtocolManager) synchronise(peer *Peer, ignoreTD bool) {
 	// Short circuit if no peers are available
 	if peer == nil {
+		log.Infof("mc sync +++++++++++++++++++ fail: no peer 1111111111111")
 		return
 	}
 	// Make sure the Peer's TD is higher than our own
 	currentBlock := pm.blockchain.CurrentBlock()
 	td := pm.blockchain.GetTd(currentBlock.Hash(), currentBlock.NumberU64())
-
 	pHead, pTd := peer.Head()
-	if pTd.Cmp(td) <= 0 {
-		return
+
+	// Ignore TD in case of locked peers with same height but different block
+	if !ignoreTD {
+		if pTd.Cmp(td) <= 0 {
+			log.Infof(
+				"mc sync remote: %d, local: %d +++++++++++++++++++ fail td too small 222222222",
+				pTd, td,
+			)
+			return
+		}
 	}
 	// Otherwise try to sync with the downloader
 	mode := downloader.FullSync
-	if atomic.LoadUint32(&pm.fastSync) == 1 {
-		// Fast sync was explicitly requested, and explicitly granted
-		mode = downloader.FastSync
-	} else if currentBlock.NumberU64() == 0 && pm.blockchain.CurrentFastBlock().NumberU64() > 0 {
-		// The database seems empty as the current block is the genesis. Yet the fast
-		// block is ahead, so fast sync was enabled for this node at a certain point.
-		// The only scenario where this can happen is if the user manually (or via a
-		// bad block) rolled back a fast sync node below the sync point. In this case
-		// however it's safe to reenable fast sync.
-		atomic.StoreUint32(&pm.fastSync, 1)
-		mode = downloader.FastSync
-	}
+	/*
+		if atomic.LoadUint32(&pm.fastSync) == 1 {
+			// Fast sync was explicitly requested, and explicitly granted
+			mode = downloader.FastSync
+		} else if currentBlock.NumberU64() == 0 && pm.blockchain.CurrentFastBlock().NumberU64() > 0 {
+			// The database seems empty as the current block is the genesis. Yet the fast
+			// block is ahead, so fast sync was enabled for this node at a certain point.
+			// The only scenario where this can happen is if the user manually (or via a
+			// bad block) rolled back a fast sync node below the sync point. In this case
+			// however it's safe to reenable fast sync.
+			atomic.StoreUint32(&pm.fastSync, 1)
+			mode = downloader.FastSync
+		}*/
 	// Run the sync cycle, and disable fast sync if we've went past the pivot block
 	err := pm.downloader.Synchronise(peer.id, pHead, pTd, mode)
 
@@ -199,6 +210,7 @@ func (pm *ProtocolManager) synchronise(peer *Peer) {
 		}
 	}
 	if err != nil {
+		log.Infof("mc sync %v +++++++++++++++++++ fail 33333333333", err)
 		return
 	}
 	atomic.StoreUint32(&pm.acceptTxs, 1) // Mark initial sync done

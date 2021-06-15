@@ -158,7 +158,8 @@ func ImportChain(chain *core.BlockChain, fn string) error {
 		}
 
 		liveFlag := false
-		if _, err := chain.InsertChain(blocks[:i], liveFlag); err != nil {
+		syncBlock := true
+		if _, err := chain.InsertChain(blocks[:i], liveFlag, syncBlock); err != nil {
 			return fmt.Errorf("invalid block %d: %v", n, err)
 		}
 	}

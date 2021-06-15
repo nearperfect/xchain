@@ -16,9 +16,18 @@
 
 package params
 
+import (
+	"math/big"
+)
+
 const (
 	MinVSSRunInterval     uint64 = 2   // Min interval in seconds between two UpdateVSSConfig()
 	MaximumBLSHistorySize uint64 = 100 // Maximum size of bls history stored
-	MinBLSBlockNumber     uint64 = 2   // Minimum block number that bls sig in block header is required
+	MinBLSBlockNumber     uint64 = 1   // Minimum block number that bls sig in block header is required
 	BlockInterval         uint64 = 10  // New block generate time interval
+)
+
+var (
+	PosDifficultyPerBlock = big.NewInt(1000)
+	PosBaseDifficulty     = big.NewInt(100000000000)
 )

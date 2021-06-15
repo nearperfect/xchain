@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
-	"reflect"
 	"sort"
 	"sync/atomic"
 	//"strconv"
@@ -22,11 +21,16 @@ import (
 	"github.com/MOACChain/xchain/consensus/pos"
 	"github.com/MOACChain/xchain/core"
 	"github.com/MOACChain/xchain/event"
-	xparams "github.com/MOACChain/xchain/params"
 )
 
 const (
-	ChainHeadChanSize = 10
+	// txChanSize is the size of channel listening to TxPreEvent.
+	// The number is referenced from the size of tx pool.
+	txChanSize = 4096
+	// chainHeadChanSize is the size of channel listening to ChainHeadEvent.
+	chainHeadChanSize = 10
+	// chainSideChanSize is the size of channel listening to ChainSideEvent.
+	chainSideChanSize = 10
 )
 
 // Agent can register themself with the worker
@@ -50,6 +54,7 @@ type Work struct {
 	txs       []*types.Transaction
 	receipts  []*types.Receipt
 	createdAt time.Time
+	tcount    int
 }
 
 // worker is the main object which takes care of applying messages to the new state
@@ -59,10 +64,7 @@ type worker struct {
 	pos              *pos.Pos
 	mu               sync.Mutex
 	mux              *event.TypeMux // update loop
-	blockGenTimerCh  chan core.BlockGenTimerEvent
-	blockGenTimerSub event.Subscription
 	currentMu        sync.Mutex
-	blockGenTicker   *core.Ticker
 	blockGenEpochBLS chan int64
 	blockGenRunning  bool
 	mc               Backend
@@ -74,6 +76,14 @@ type worker struct {
 	wg               sync.WaitGroup
 	recv             chan *Result
 	extra            []byte
+
+	// subscribe to channels
+	txCh         chan core.TxPreEvent
+	txSub        event.Subscription
+	chainHeadCh  chan core.ChainHeadEvent
+	chainHeadSub event.Subscription
+	chainSideCh  chan core.ChainSideEvent
+	chainSideSub event.Subscription
 }
 
 type Result struct {
@@ -92,29 +102,21 @@ func NewWorker(
 	worker := &worker{
 		config:           config,
 		mux:              mux,
-		blockGenTimerCh:  make(chan core.BlockGenTimerEvent, ChainHeadChanSize),
+		txCh:             make(chan core.TxPreEvent, txChanSize),
+		chainHeadCh:      make(chan core.ChainHeadEvent, chainHeadChanSize),
+		chainSideCh:      make(chan core.ChainSideEvent, chainSideChanSize),
 		chain:            mc.BlockChain(),
 		pos:              engine.(*pos.Pos),
 		blockGenEpochBLS: make(chan int64),
 		mc:               mc,
 		agents:           make(map[Agent]struct{}),
+		coinbase:         coinbase,
 	}
 
-	worker.blockGenTimerSub = mc.BlockChain().SubscribeBlockGenTimerEvent(worker.blockGenTimerCh)
-	go worker.update()
+	worker.txSub = mc.TxPool().SubscribeTxPreEvent(worker.txCh)
+	worker.chainHeadSub = mc.BlockChain().SubscribeChainHeadEvent(worker.chainHeadCh)
+	worker.chainSideSub = mc.BlockChain().SubscribeChainSideEvent(worker.chainSideCh)
 
-	return worker
-}
-
-func newWorkerAsMonitor(config *params.ChainConfig, bc *core.BlockChain) *worker {
-	worker := &worker{
-		config:          config,
-		mux:             new(event.TypeMux),
-		blockGenTimerCh: make(chan core.BlockGenTimerEvent, ChainHeadChanSize),
-		chain:           bc,
-	}
-
-	worker.blockGenTimerSub = bc.SubscribeBlockGenTimerEvent(worker.blockGenTimerCh)
 	go worker.update()
 
 	return worker
@@ -196,21 +198,6 @@ func (worker *worker) unregister(agent Agent) {
 	agent.Stop()
 }
 
-func (worker *worker) UpdateTimer(length int) {
-	if worker.blockGenTicker != nil && length > 0 {
-		//remove current ticker
-		worker.blockGenTicker.Period = time.Duration(length) * time.Second
-		worker.blockGenTicker.ResetTicker()
-	}
-}
-
-func (worker *worker) StopTimer() {
-	// blockGenTicker of monitor scs is nil
-	if worker.blockGenTicker != nil {
-		worker.blockGenTicker.Stop()
-	}
-}
-
 func (worker *worker) blockGenBLSBeacon() {
 	ticker := time.NewTicker(50 * time.Millisecond)
 	timeMillisecond := time.Now().UnixNano() / int64(time.Millisecond)
@@ -252,7 +239,7 @@ func (worker *worker) getProposer(block *types.Block, epoch int64) common.Addres
 
 	// sort the nodelist
 	nodelist := worker.pos.NodeList
-	log.Infof("worker.pos.NodeList: %d", len(worker.pos.NodeList))
+	log.Debugf("worker.pos.NodeList: %d", len(worker.pos.NodeList))
 	nodelistSorted := []string{}
 	for _, node := range nodelist {
 		nodelistSorted = append(nodelistSorted, fmt.Sprintf("%s", node.Bytes()))
@@ -269,10 +256,10 @@ func (worker *worker) genSigShare(epoch int64) pos.SigShareMessage {
 	var sigShareMessage pos.SigShareMessage
 	if worker.pos.IsVSSReady() {
 		// prepare fields to sign
-		currentblock := worker.chain.CurrentBlock()
-		blockHash := currentblock.Hash().Bytes()
-		nextBlockNumber := new(big.Int).Add(currentblock.Number(), big.NewInt(1)).Int64()
-		proposer := worker.getProposer(currentblock, epoch)
+		currentBlock := worker.chain.CurrentBlock()
+		blockHash := currentBlock.Hash().Bytes()
+		nextBlockNumber := new(big.Int).Add(currentBlock.Number(), big.NewInt(1)).Int64()
+		proposer := worker.getProposer(currentBlock, epoch)
 
 		// format the toSign string and sign with bls
 		toSign := fmt.Sprintf(
@@ -283,19 +270,20 @@ func (worker *worker) genSigShare(epoch int64) pos.SigShareMessage {
 			epoch,
 		)
 		sig := worker.pos.Bls.SignBytes([]byte(toSign))
-		log.Infof(
-			"gen sig share hash: %x, epoch: %d, proposer: %x, sig: %x",
+		log.Debugf(
+			"gen sig share,block hash: %x, epoch: %d, proposer: %x, sig: %x",
 			blockHash[:8], epoch, proposer.Bytes(), sig,
 		)
 
 		// generate the sig share message
 		sigShareMessage = pos.SigShareMessage{
-			FromIndex:   worker.pos.Bls.NodeIndex,
+			FromIndex:   big.NewInt(int64(worker.pos.Bls.NodeIndex)),
 			Sig:         sig,
 			ForProposer: proposer.Bytes(),
-			BlockNumber: nextBlockNumber,
+			BlockNumber: big.NewInt(nextBlockNumber),
 			BlockHash:   blockHash,
-			Epoch:       epoch,
+			Epoch:       big.NewInt(epoch),
+			Difficulty:  currentBlock.Difficulty(),
 		}
 	}
 
@@ -303,22 +291,18 @@ func (worker *worker) genSigShare(epoch int64) pos.SigShareMessage {
 }
 
 func (worker *worker) sendSigShare(sigShare *pos.SigShareMessage) error {
-	log.Infof("------------------- begin send sigshare: %v", sigShare)
 	// broadcast to other peers
-	//err := worker.mux.Post(core.NewSigShareEvent{SigShare: sigShare})
+	worker.mux.Post(core.NewSigShareEvent{SigShare: sigShare})
 	// send one to self by directly sending to the channel
-	log.Infof("--------------------mid mux send sigShare, err: %v", nil)
 	worker.pos.Vss.SigShareChan <- sigShare
-	log.Infof("------------------- end send sigshare: %s", sigShare.Key())
 	return nil
 }
 
 func (worker *worker) blockGenBLS(sigShareMessage pos.SigShareMessage) {
 	if worker.pos.IsVSSReady() {
 		//commitNewWorkTime := int(time.Now().Unix())
-		log.Infof("Generate new block vss, current head: %d", worker.chain.CurrentBlock())
+		log.Infof("To generate new block vss, current head: %d", worker.chain.CurrentBlock())
 		work := worker.commitNewWork(&sigShareMessage)
-		log.Infof("after commitNewWork() vss: work = %v", work)
 		var block *types.Block
 		if work != nil {
 			if block = worker.GenBlock(work); block != nil {
@@ -347,16 +331,16 @@ func (worker *worker) tryBlockGenBLS(sigShareMessage pos.SigShareMessage) {
 	// todo: use trylock once golang supports it in mutex
 	worker.blockGenRunning = true
 	defer func() {
-		log.Infof("in tryblockgenbls(), end block generation")
+		log.Infof("In tryBlockGenBLS(), end block generation")
 		worker.blockGenRunning = false
 	}()
 
-	log.Infof("in tryblockgenbls(), begin block generation")
+	log.Infof("In tryBlockGenBLS(), begin block generation")
 	if !worker.pos.IsConsensus() {
-		log.Infof("vss scs not in consensus group, will continue")
+		log.Debugf("vss scs not in consensus group, will continue")
 		return
 	} else {
-		log.Infof("vss scs in consensus group, will participate")
+		log.Debugf("vss scs in consensus group, will participate")
 	}
 
 	// if I'm proposer, I should collect all sigs and generate the block
@@ -386,7 +370,7 @@ func (worker *worker) blockGenBLSLoop() {
 		case epoch := <-worker.blockGenEpochBLS:
 			if worker.pos.IsVSSReady() {
 				log.Infof(
-					"gen bls block, current block: %d, %x",
+					"blockGenBLSLoop: current block: %d, %x",
 					worker.chain.CurrentBlock().Number(),
 					worker.chain.CurrentBlock().Hash().Bytes()[:8],
 				)
@@ -406,38 +390,28 @@ func (worker *worker) blockGenBLSLoop() {
 }
 
 func (worker *worker) update() {
-	defer worker.blockGenTimerSub.Unsubscribe()
+	defer worker.txSub.Unsubscribe()
+	defer worker.chainHeadSub.Unsubscribe()
+	defer worker.chainSideSub.Unsubscribe()
+
 	for {
 		// A real event arrived, process interesting content
 		select {
-		case blk := <-worker.blockGenTimerCh:
-			// Update backupscs to nodelist if need
-			if worker.pos.IsConsensus() {
-				//no need to create new work here.
-				//get block generator index in vnode info
-				loc, nodecnt := worker.pos.FindAddressInNodelist(blk.Block.Header().Coinbase)
-				if loc < 0 {
-					continue
-				}
-
-				newwait := 0
-				if loc >= worker.pos.Position {
-					newwait = (worker.pos.Position - loc + nodecnt) * int(xparams.BlockInterval)
-				} else {
-					newwait = (worker.pos.Position - loc) * int(xparams.BlockInterval)
-				}
-				// now reset block gen timer
-				log.Infof(
-					"blockGenTimerCh UpdateTimer:Position: %v, newwait: %v",
-					worker.pos.Position,
-					newwait,
-				)
-				worker.UpdateTimer(newwait)
-			}
-
+		// Handle ChainHeadEvent
+		case ev := <-worker.chainHeadCh:
+			log.Debugf("%v", ev)
+		// Handle ChainSideEvent
+		case ev := <-worker.chainSideCh:
+			log.Debugf("%v", ev)
+		// Handle TxPreEvent
+		case ev := <-worker.txCh:
+			log.Debugf("%v", ev)
 		// System stopped
-		case err := <-worker.blockGenTimerSub.Err():
-			log.Error("blockGenTimerSub", "err", err)
+		case <-worker.txSub.Err():
+			return
+		case <-worker.chainHeadSub.Err():
+			return
+		case <-worker.chainSideSub.Err():
 			return
 		}
 	}
@@ -471,9 +445,10 @@ func (worker *worker) GenBlock(work *Work) *types.Block {
 		log.Errorf("Failed writing block to chain: number %d, hash: %x, error: %v", block.Number(), block.Hash().Bytes()[:8], err)
 		return nil
 	}
-
+	log.Infof("Before worker.mux.post @@@@@@@@@@@@@@@@@@@@@@@@@@@ block: %d, hash: %x", block.Number(), block.Hash().Bytes()[:4])
 	// broadcast the block
 	worker.mux.Post(core.NewMinedBlockEvent{Block: block})
+	log.Infof("After worker.mux.Post @@@@@@@@@@@@@@@@@@@@@@@@@@@ block: %d, hash: %x", block.Number(), block.Hash().Bytes()[:4])
 	var (
 		events []interface{}
 		logs   = work.state.Logs()
@@ -481,10 +456,9 @@ func (worker *worker) GenBlock(work *Work) *types.Block {
 	events = append(events, core.ChainEvent{Block: block, Hash: block.Hash(), Logs: logs})
 	if stat == core.CanonStatTy {
 		events = append(events, core.ChainHeadEvent{Block: block})
-		events = append(events, core.BlockGenTimerEvent{Block: block})
 	}
 
-	worker.chain.PostChainEvents(events, logs)
+	//worker.chain.PostChainEvents(events, logs)
 	return block
 }
 
@@ -537,10 +511,18 @@ func (worker *worker) commitNewWork(sigShareMessage *pos.SigShareMessage) *Work 
 		ParentHash: parent.Hash(),
 		Number:     num.Add(num, common.Big1),
 		Time:       big.NewInt(tstamp),
+		GasLimit:   core.CalcGasLimit(parent),
+		GasUsed:    new(big.Int),
+		Extra:      worker.extra,
+		Difficulty: new(big.Int),
 	}
 	header.Coinbase = worker.pos.Vssid
-	log.Infof("commitNewWork parent num: %d, parent hash %x", num, header.ParentHash.Bytes())
-	log.Infof("engine type: %v", reflect.TypeOf(worker.chain.Engine()))
+	if err := worker.pos.Prepare(worker.chain, header); err != nil {
+		log.Error("Failed to prepare header for mining", "err", err)
+		return nil
+	}
+
+	log.Debugf("commitNewWork parent num: %d, parent hash %x", num, header.ParentHash.Bytes())
 
 	// make new work
 	work, err := worker.makeNewWork(parent, header)
@@ -555,17 +537,22 @@ func (worker *worker) commitNewWork(sigShareMessage *pos.SigShareMessage) *Work 
 		return nil
 	}
 	txs := types.NewTransactionsByPriceAndNonce(work.signer, pending)
-	work.commitTransactions(worker.mux, txs, worker.chain)
+	txsset := []*types.TransactionsByPriceAndNonce{txs}
+	work.commitTransactions(worker.mux, txsset, worker.chain, worker.coinbase, worker.mc)
 
 	extraData := make(map[int][]byte)
 	var blsSig []byte
 	if !worker.pos.ShouldSkipVSS(header.Number.Int64()) {
 		var err error
 		blsSig, err = worker.pos.GetBlsSig(sigShareMessage.Key())
-		log.Infof("vss bls sig = [%x], err: %v", blsSig, err)
 		if err != nil {
-			log.Infof("Failed to get vss bls sig")
+			log.Errorf("Worker FAILED to get BLS sig: %v", err)
 			return nil
+		} else {
+			log.Infof(
+				"^^^^^^^^^^^^^^^^^^^^^   Worker get BLS sig = [%x], toSign: %s, err: %v",
+				blsSig[:8], sigShareMessage.Key(), err,
+			)
 		}
 
 		// proposer will sign the bls signature with their vss private key
@@ -601,10 +588,142 @@ func (worker *worker) commitNewWork(sigShareMessage *pos.SigShareMessage) *Work 
 	return work
 }
 
+func (env *Work) commitTransactions(mux *event.TypeMux, txs []*types.TransactionsByPriceAndNonce, bc *core.BlockChain, coinbase common.Address, mc Backend) {
+	gp := new(core.GasPool).AddGas(env.header.GasLimit)
+	var coalescedLogs []*types.Log
+	var queryQueue []*types.QueryContract
+
+	{
+		systx := core.CreateSysTx(env.state)
+
+		err, receipt := env.commitTransaction(systx, bc, coinbase, gp, mc)
+		if err == nil {
+			// Everything ok, collect the logs and shift in the next transaction from the same account
+			coalescedLogs = append(coalescedLogs, receipt.Logs...)
+			env.tcount++
+		} else {
+			log.Debugf("systx failed ")
+		}
+	}
+
+	length := len(txs)
+	for i := 0; i < length; i++ {
+		for {
+			// Retrieve the next transaction and abort if all done
+			tx := txs[i].Peek()
+			if tx == nil {
+				break
+			}
+
+			// Error may be ignored here. The error has already been checked
+			// during transaction acceptance is the transaction pool.
+			//
+			// We use the eip155 signer regardless of the current hf.
+			// MOAC, use EIP155 signer
+			from, _ := types.Sender(env.signer, tx)
+
+			// Start executing the transaction
+			env.state.Prepare(tx.Hash(), common.Hash{}, env.tcount)
+
+			err, receipt := env.commitTransaction(tx, bc, coinbase, gp, mc)
+			switch err {
+			case core.ErrGasLimitReached:
+				// Pop the current out-of-gas transaction without shifting in the next from the account
+				log.Trace("GasRemaining limit exceeded for current block", "sender", from)
+				txs[i].Pop()
+
+			case core.ErrNonceTooLow:
+				// New head notification data race between the transaction pool and miner, shift
+				log.Trace("Skipping transaction with low nonce", "sender", from, "nonce", tx.Nonce())
+				txs[i].Shift()
+
+			case core.ErrNonceTooHigh:
+				// Reorg notification data race between the transaction pool and miner, skip account =
+				log.Trace("Skipping account with hight nonce", "sender", from, "nonce", tx.Nonce())
+				txs[i].Pop()
+
+			//fix 1
+			case vm.ErrEmptyCode:
+				// Reorg notification data race between the transaction pool and miner, skip account =
+				log.Trace("Skipping account with empty code", "sender", from, "nonce", tx.Nonce())
+				txs[i].Pop()
+
+			case vm.ErrInvalidCode:
+				// Reorg notification data race between the transaction pool and miner, skip account =
+				log.Trace("Skipping account with invalid code, check compiler version", "sender", from, "nonce", tx.Nonce())
+				txs[i].Pop()
+
+			case nil:
+				if receipt.QueryInBlock > 0 {
+					//add to queue for system contract call
+					queryQueue = append(queryQueue, &types.QueryContract{Block: receipt.QueryInBlock, ContractAddress: receipt.ContractAddress})
+				}
+				// Everything ok, collect the logs and shift in the next transaction from the same account
+				coalescedLogs = append(coalescedLogs, receipt.Logs...)
+				env.tcount++
+				txs[i].Shift()
+
+			default:
+				// Strange error, discard the transaction and get the next in line (note, the
+				// nonce-too-high clause will prevent us from executing in vain).
+				log.Debug("Transaction failed, account skipped", "hash", tx.Hash(), "err", err)
+				txs[i].Shift()
+			}
+		}
+	}
+
+	if len(coalescedLogs) > 0 || env.tcount > 0 {
+		// make a copy, the state caches the logs and these logs get "upgraded" from pending to mined
+		// logs by filling in the block hash when the block was mined by the local miner. This can
+		// cause a race condition if a log was "upgraded" before the PendingLogsEvent is processed.
+		cpy := make([]*types.Log, len(coalescedLogs))
+		for i, l := range coalescedLogs {
+			cpy[i] = new(types.Log)
+			*cpy[i] = *l
+		}
+		go func(logs []*types.Log, tcount int) {
+			if len(logs) > 0 {
+				mux.Post(core.PendingLogsEvent{Logs: logs})
+			}
+			if tcount > 0 {
+				mux.Post(core.PendingStateEvent{})
+			}
+		}(cpy, env.tcount)
+	}
+}
+
+func (env *Work) commitTransaction(tx *types.Transaction, bc *core.BlockChain, coinbase common.Address, gp *core.GasPool, mc Backend) (error, *types.Receipt) {
+	snap := env.state.Snapshot()
+
+	//here NetworkRelay becomes NetworkRelayInterface item.
+	receipt, _, err := core.ApplyTransaction(
+		env.config,
+		bc,
+		&coinbase,
+		gp,
+		env.state,
+		env.header,
+		tx,
+		env.header.GasUsed,
+		vm.Config{},
+		mc.TxPool(),
+	)
+	if err != nil {
+		env.state.RevertToSnapshot(snap)
+		return err, nil
+	}
+	env.txs = append(env.txs, tx)
+	env.receipts = append(env.receipts, receipt)
+
+	return nil, receipt
+}
+
+/*
 func (worker *Work) commitTransactions(
 	mux *event.TypeMux, txs *types.TransactionsByPriceAndNonce, bc *core.BlockChain,
 ) {
 	gp := new(core.GasPool).AddGas(params.TargetGasLimit)
+
 	for {
 		if remain := gp.Value(); remain < params.TxGas || remain > params.TargetGasLimit.Uint64() {
 			log.Trace("Not enough gas for further transactions", "have", remain, "want", params.TxGas)
@@ -616,6 +735,11 @@ func (worker *Work) commitTransactions(
 			break
 		}
 
+		// Error may be ignored here. The error has already been checked
+		// during transaction acceptance is the transaction pool.
+		//
+		// We use the eip155 signer regardless of the current hf.
+		// MOAC, use EIP155 signer
 		from, err := types.Sender(worker.signer, tx)
 		if err != nil {
 			continue
@@ -623,6 +747,7 @@ func (worker *Work) commitTransactions(
 
 		// Start executing the transaction
 		worker.state.Prepare(tx.Hash(), common.Hash{}, worker.txsCount)
+
 		err, _ = worker.commitTransaction(tx, bc, gp)
 		switch err {
 		case core.ErrGasLimitReached:
@@ -662,63 +787,11 @@ func (worker *Work) commitTransactions(
 	}
 }
 
-func (worker *Work) commitResetTransactions(
-	mux *event.TypeMux, txs types.Transactions, bc *core.BlockChain,
-) {
-	gp := new(core.GasPool).AddGas(params.TargetGasLimit)
-	for i := 0; i < len(txs); i++ {
-		if remain := gp.Value(); remain < params.TxGas || remain > params.TargetGasLimit.Uint64() {
-			log.Trace("Not enough gas for further transactions", "have", remain, "want", params.TxGas)
-			break
-		}
-		// Retrieve the next transaction and abort if all done
-		tx := txs[i]
-		if tx == nil {
-			break
-		}
-
-		from, err := types.Sender(worker.signer, tx)
-		if err != nil {
-			continue
-		}
-
-		// Start executing the transaction
-		worker.state.Prepare(tx.Hash(), common.Hash{}, worker.txsCount)
-		err, _ = worker.commitTransaction(tx, bc, gp)
-		switch err {
-		case core.ErrGasLimitReached:
-			// Pop the current out-of-gas transaction without shifting in the next from the account
-			log.Errorf(
-				"GasRemaining limit exceeded for current block, sender: %x",
-				from.Bytes()[:8],
-			)
-		case core.ErrNonceTooLow:
-			// New head notification data race between the transaction pool and miner, shift
-			log.Errorf(
-				"Skipping transaction with low nonce, sender: %x, nonce: %d",
-				from.Bytes()[:8], tx.Nonce(),
-			)
-		case core.ErrNonceTooHigh:
-			// Reorg notification data race between the transaction pool and miner, skip account =
-			log.Errorf(
-				"Skipping account with hight nonce, sender: %x, nonce: %d",
-				from.Bytes()[:8], tx.Nonce(),
-			)
-		case nil:
-			worker.txsCount++
-		default:
-			log.Errorf(
-				"Transaction failed, account skipped, hash: %x, err: %s",
-				tx.Hash().Bytes()[:8], err,
-			)
-		}
-	}
-}
-
 func (worker *Work) commitTransaction(
 	tx *types.Transaction, bc *core.BlockChain, gp *core.GasPool,
 ) (error, *types.Receipt) {
 	snap := worker.state.Snapshot()
+
 	totalUsedGas := big.NewInt(0)
 	receipt, _, err := core.ApplyTransaction(
 		worker.config,
@@ -743,3 +816,4 @@ func (worker *Work) commitTransaction(
 
 	return nil, receipt
 }
+*/

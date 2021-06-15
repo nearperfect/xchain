@@ -29,6 +29,7 @@ import (
 	"github.com/MOACChain/MoacLib/state"
 	"github.com/MOACChain/MoacLib/types"
 	"github.com/MOACChain/xchain/consensus"
+	xparams "github.com/MOACChain/xchain/params"
 	"github.com/MOACChain/xchain/rpc"
 )
 
@@ -42,6 +43,77 @@ var (
 	errLargeBlockTime = errors.New("timestamp too big")
 	errZeroBlockTime  = errors.New("timestamp equals parent's")
 )
+
+// Some weird constants to avoid constant memory allocs for them.
+var (
+	big8  = big.NewInt(8)
+	big32 = big.NewInt(32)
+)
+
+var (
+	byzantiumBlockReward *big.Int = big.NewInt(2e+18)    // Block reward in sha for successfully mining a block upward from Byzantium
+	HalvBlockInterval             = big.NewInt(12500000) //3000000, 12,500,000
+	HalvBlockInterval2            = big.NewInt(25000000) //6000000
+	HalvBlockInterval4            = big.NewInt(37500000) //9000000
+	HalvBlockInterval5            = big.NewInt(50000000) //12000000
+	HalvBlockInterval6            = big.NewInt(62500000) //15000000
+	maxUncles                     = 2                    // Maximum number of uncles allowed in a single block
+	maxSyncBlockNum      uint64   = 20                   // Within maximum number of Synchronising block, liveFlag = true
+)
+
+func getFrame(skipFrames int) runtime.Frame {
+	// We need the frame at index skipFrames+2, since we never want runtime.Callers and getFrame
+	targetFrameIndex := skipFrames + 2
+
+	// Set size to targetFrameIndex+2 to ensure we have room for one more caller than we need
+	programCounters := make([]uintptr, targetFrameIndex+2)
+	n := runtime.Callers(0, programCounters)
+
+	frame := runtime.Frame{Function: "unknown"}
+	if n > 0 {
+		frames := runtime.CallersFrames(programCounters[:n])
+		for more, frameIndex := true, 0; more && frameIndex <= targetFrameIndex; frameIndex++ {
+			var frameCandidate runtime.Frame
+			frameCandidate, more = frames.Next()
+			if frameIndex == targetFrameIndex {
+				frame = frameCandidate
+			}
+		}
+	}
+
+	return frame
+}
+
+/*
+ * MOAC mining rewards change through time
+ * Reward (1 MOAC = 1,000,000 Sand = 1e+18 Sha)
+2018.4 - 2022.4:  1-12,500,000 2 MOAC
+2022.4 - 2026.4:  12,500,001-25,000,000 1 MOAC
+2026.4 - 2030.4:  25,000,001-37,500,000 0.5 MOAC
+2030.4 - 2034.4:  37,500,001-50,000,000 0.25 MOAC
+2034.4 - 2038.4:  50,000,001-62,500,000 0.125 MOAC
+2038.4 -       :  62,500,001-           0.1 MOAC
+
+*/
+func calcBlockReward(num *big.Int) *big.Int {
+	//Compare the input block number to set the right
+	//mining rewards.
+
+	switch {
+	case num.Cmp(HalvBlockInterval) <= 0:
+		return big.NewInt(2e+18)
+	case num.Cmp(HalvBlockInterval2) <= 0:
+		return big.NewInt(1e+18)
+	case num.Cmp(HalvBlockInterval4) <= 0:
+		return big.NewInt(5e+17)
+	case num.Cmp(HalvBlockInterval5) <= 0:
+		return big.NewInt(25e+16)
+	case num.Cmp(HalvBlockInterval6) <= 0:
+		return big.NewInt(125e+15)
+	default:
+		return big.NewInt(1e+17)
+	}
+}
 
 // Author implements consensus.Engine, returning the header's coinbase as the
 // proof-of-work verified author of the block.
@@ -65,8 +137,8 @@ func (pos Pos) VerifyHeaders(
 	chain consensus.ChainReader,
 	headers []*types.Header,
 	seals []bool,
+	syncBlock bool,
 ) (chan<- struct{}, <-chan error) {
-	fixBlock := false
 	fromBroadcast := true
 
 	// Spawn as many workers as allowed threads
@@ -90,7 +162,7 @@ func (pos Pos) VerifyHeaders(
 					headers,
 					seals,
 					index,
-					fixBlock,
+					syncBlock,
 					fromBroadcast,
 				)
 				done <- index
@@ -133,7 +205,7 @@ func (pos Pos) verifyHeaderWorker(
 	headers []*types.Header,
 	seals []bool,
 	index int,
-	fixBlock bool,
+	syncBlock bool,
 	fromBroadcast bool,
 ) (err error) {
 	// use defer to record received blocks before return
@@ -175,11 +247,22 @@ func (pos Pos) verifyHeaderWorker(
 	}
 
 	// if we find the parent, this is the normal case
-	return pos.verifyHeader(chain, headers[index], parent, seals[index], fixBlock)
+	return pos.verifyHeader(chain, headers[index], parent, seals[index], syncBlock)
 }
 
-func (pos Pos) VerifyHeader(chain consensus.ChainReader, header *types.Header, seal bool) error {
-	return nil
+func (pos Pos) VerifyHeader(chain consensus.ChainReader, header *types.Header, seal bool, syncBlock bool) error {
+	// Short circuit if the header is known, or it's parent not
+	number := header.Number.Uint64()
+	if chain.GetHeader(header.Hash(), number) != nil {
+		return nil
+	}
+	parent := chain.GetHeader(header.ParentHash, number-1)
+	if parent == nil {
+		return consensus.ErrUnknownAncestor
+	}
+
+	// Sanity checks passed, do a proper verification
+	return pos.verifyHeader(chain, header, parent, seal, syncBlock)
 }
 
 // verifyHeader checks whether a header conforms to the consensus rules of the
@@ -188,7 +271,7 @@ func (pos Pos) verifyHeader(
 	chain consensus.ChainReader,
 	header, parent *types.Header,
 	seal bool,
-	fixBlock bool,
+	syncBlock bool,
 ) error {
 	// Ensure that the header's extra-data section is of a reasonable size
 	if uint64(len(header.Extra)) > params.MaximumExtraDataSize {
@@ -229,12 +312,14 @@ func (pos Pos) verifyHeader(
 			"%x,%x,%d,%s",
 			parentHash, header.Coinbase.Bytes(), header.Number.Int64(), epoch,
 		)
-		validated := pos.ValidateBLSSig([]byte(toSign), blsSig, fixBlock, header.Number.Int64())
-		log.Debugf(
-			"validate bls sig block number = %d, result = %t, fixblock = %t, bissig = %v, toSign = %s",
+		validated, err := pos.ValidateBLSSig([]byte(toSign), blsSig, syncBlock, header.Number.Int64())
+		log.Infof(
+			"@@@@@@@@@@@@@@@@@@ [%s] Validate bls sig block number = %d, result = %t (%v), syncBlock = %t, bissig = %v, toSign = %s",
+			getFrame(2).Function,
 			header.Number.Int64(),
 			validated,
-			fixBlock,
+			err,
+			syncBlock,
 			common.Bytes2Hex(blsSig),
 			toSign,
 		)
@@ -245,7 +330,7 @@ func (pos Pos) verifyHeader(
 		// verify proposer signature in extra data
 		proposerSig := (*extraData)[params.ProposerSig]
 		validatedProposerSig := pos.ValidateProposerSig(
-			proposerSig, header.Coinbase, blsSig, fixBlock, header.Number.Int64(),
+			proposerSig, header.Coinbase, blsSig, syncBlock, header.Number.Int64(),
 		)
 		if !validatedProposerSig {
 			return fmt.Errorf("proposer signature not verify")
@@ -271,6 +356,8 @@ func (pos Pos) Finalize(
 	receipts []*types.Receipt,
 	liveFlag bool,
 ) (*types.Block, error) {
+	// Accumulate any block and uncle rewards and commit the final state root
+	AccumulateRewards(chain.Config(), state, header, uncles)
 	header.Root = state.IntermediateRoot(true)
 	log.Debugf(
 		"Finalize/IntermediateRoot(true) num: %d, root: 0x%x, live: %t",
@@ -286,12 +373,49 @@ func (pos Pos) APIs(chain consensus.ChainReader) []rpc.API {
 	return nil
 }
 
-// currently empty
+// Prepare implements consensus.Engine, simulating the difficulty field of a
+// header to conform to the ethash protocol. The changes are done inline.
 func (pos Pos) Prepare(chain consensus.ChainReader, header *types.Header) error {
+	parent := chain.GetHeader(header.ParentHash, header.Number.Uint64()-1)
+	if parent == nil {
+		return consensus.ErrUnknownAncestor
+	}
+	// simulating the ethash diff
+	header.Difficulty = CalcDifficulty(chain.Config(), header.Time.Uint64(), parent)
 	return nil
+}
+
+// Just simply add 1000 difficulty
+func CalcDifficulty(config *params.ChainConfig, time uint64, parent *types.Header) *big.Int {
+	return new(big.Int).Set(xparams.PosDifficultyPerBlock)
 }
 
 // return true, assuming no monitor nodes
 func (pos Pos) IsConsensus() bool {
 	return true
+}
+
+// AccumulateRewards credits the moacbase of the given block with the mining
+// reward. The total reward consists of the static block reward and rewards for
+// included uncles. The coinbase of each uncle block is also rewarded.
+// TODO (karalabe): Move the chain maker into this package and make this private!
+func AccumulateRewards(config *params.ChainConfig, state *state.StateDB, header *types.Header, uncles []*types.Header) {
+	// Select the correct block reward based on chain progression
+	blockReward := calcBlockReward(header.Number)
+
+	// Accumulate the rewards for the miner and any included uncles
+	reward := new(big.Int).Set(blockReward)
+
+	r := new(big.Int)
+	for _, uncle := range uncles {
+		r.Add(uncle.Number, big8)
+		r.Sub(r, header.Number)
+		r.Mul(r, blockReward)
+		r.Div(r, big8)
+		state.AddBalance(uncle.Coinbase, r)
+
+		r.Div(blockReward, big32)
+		reward.Add(reward, r)
+	}
+	state.AddBalance(header.Coinbase, reward)
 }

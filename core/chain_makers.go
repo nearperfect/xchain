@@ -235,15 +235,16 @@ func newCanonical(n int, full bool) (mcdb.Database, *BlockChain, error) {
 	if n == 0 {
 		return db, blockchain, nil
 	}
+	syncBlock := true
 	if full {
 		// Full block-chain requested
 		blocks := makeBlockChain(genesis, n, db, canonicalSeed)
-		_, err := blockchain.InsertChain(blocks, false)
+		_, err := blockchain.InsertChain(blocks, false, syncBlock)
 		return db, blockchain, err
 	}
 	// Header-only chain requested
 	headers := makeHeaderChain(genesis.Header(), n, db, canonicalSeed)
-	_, err := blockchain.InsertHeaderChain(headers, 1)
+	_, err := blockchain.InsertHeaderChain(headers, 1, syncBlock)
 	return db, blockchain, err
 }
 

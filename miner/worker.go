@@ -256,8 +256,14 @@ func (self *worker) update() {
 				acc, _ := types.Sender(self.current.signer, ev.Tx)
 				txs := map[common.Address]types.Transactions{acc: {ev.Tx}}
 				txset := types.NewTransactionsByPriceAndNonce(self.current.signer, txs)
-
-				self.current.commitTransactions(self.mux, []*types.TransactionsByPriceAndNonce{txset}, self.chain, self.coinbase, self.mc, nil)
+				self.current.commitTransactions(
+					self.mux,
+					[]*types.TransactionsByPriceAndNonce{txset},
+					self.chain,
+					self.coinbase,
+					self.mc,
+					nil,
+				)
 				self.currentMu.Unlock()
 			}
 
@@ -517,11 +523,8 @@ func (env *Work) commitTransactions(mux *event.TypeMux, txs []*types.Transaction
 			// Retrieve the next transaction and abort if all done
 			tx := txs[i].Peek()
 			if tx == nil {
-				log.Debug("no tx in pool")
 				break
 			}
-
-			log.Debugf("txs[%d]: %s", i, tx.Hash().String())
 
 			// Error may be ignored here. The error has already been checked
 			// during transaction acceptance is the transaction pool.
@@ -604,7 +607,18 @@ func (env *Work) commitTransaction(tx *types.Transaction, bc *core.BlockChain, c
 	snap := env.state.Snapshot()
 
 	//here NetworkRelay becomes NetworkRelayInterface item.
-	receipt, _, err := core.ApplyTransaction(env.config, bc, &coinbase, gp, env.state, env.header, tx, env.header.GasUsed, vm.Config{}, mc.TxPool())
+	receipt, _, err := core.ApplyTransaction(
+		env.config,
+		bc,
+		&coinbase,
+		gp,
+		env.state,
+		env.header,
+		tx,
+		env.header.GasUsed,
+		vm.Config{},
+		mc.TxPool(),
+	)
 	if err != nil {
 		env.state.RevertToSnapshot(snap)
 		return err, nil

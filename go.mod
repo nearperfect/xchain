@@ -52,3 +52,4 @@ require (
 )
 
 replace github.com/MOACChain/MoacLib => /media/yifan/ssd/go/src/github.com/MOACChain/MoacLib
+replace  github.com/innowells/bls_lib/v2 => /media/yifan/ssd/go/src/github.com/innowells/bls_lib

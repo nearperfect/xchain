@@ -63,8 +63,6 @@ type ChainSideEvent struct {
 
 type ChainHeadEvent struct{ Block *types.Block }
 
-type BlockGenTimerEvent struct{ Block *types.Block }
-
 type TxShardJoinEvent struct{ Tx *types.Transaction }
 
 type SigShares []*pos.SigShareMessage

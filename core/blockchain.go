@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"math/big"
-	mrand "math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -49,6 +48,7 @@ import (
 var (
 	blockInsertTimer = metrics.NewTimer("chain/inserts")
 	ErrNoGenesis     = errors.New("Genesis not found in chain")
+	ErrNoReorg       = errors.New("Can not reorg current chain")
 )
 
 const (
@@ -697,7 +697,8 @@ func (bc *BlockChain) procFutureBlocks() {
 		// Insert one by one as chain insertion needs contiguous ancestry between blocks
 		for i := range blocks {
 			liveFlag := true
-			bc.InsertChain(blocks[i:i+1], liveFlag)
+			syncBlock := false
+			bc.InsertChain(blocks[i:i+1], liveFlag, syncBlock)
 		}
 	}
 }
@@ -879,6 +880,7 @@ func (bc *BlockChain) WriteBlockAndState(block *types.Block, receipts []*types.R
 
 	localTd := bc.GetTd(bc.currentBlock.Hash(), bc.currentBlock.NumberU64())
 	externTd := new(big.Int).Add(block.Difficulty(), ptd)
+	log.Infof("---------------------localtd: %d, ---------------- extern td: %d, parent td: %d, block diff: %d", localTd, externTd, ptd, block.Difficulty())
 
 	// Irrelevant of the canonical status, write the block itself to the database
 	if err := bc.hc.WriteTd(block.Hash(), block.NumberU64(), externTd); err != nil {
@@ -906,12 +908,31 @@ func (bc *BlockChain) WriteBlockAndState(block *types.Block, receipts []*types.R
 		return NonStatTy, err
 	}
 
+	log.Infof(
+		"-------------------------- parent: %x, new.parent: %x",
+		bc.currentBlock.Hash().Bytes()[:8], block.ParentHash().Bytes()[:8],
+	)
 	// If the total difficulty is higher than our known, add it to the canonical chain
 	// Second clause in the if statement reduces the vulnerability to selfish mining.
 	// Please refer to http://www.cs.cornell.edu/~ie53/publications/btcProcFC.pdf
-	if externTd.Cmp(localTd) > 0 || (externTd.Cmp(localTd) == 0 && mrand.Float64() < 0.5) {
-		// Reorganise the chain if the parent is not the head block
+	if externTd.Cmp(localTd) > 0 || (externTd.Cmp(localTd) == 0) {
+		log.Infof(
+			"---------------------------- in reorg 1, old: <%d>, %x, new: <%d>, %x",
+			bc.currentBlock.NumberU64(), bc.currentBlock.Hash().Bytes()[:8],
+			block.NumberU64(), block.Hash().Bytes()[:8],
+		)
+		// see if we need to reorg first before other steps
 		if block.ParentHash() != bc.currentBlock.Hash() {
+			log.Infof(
+				"----------------------------????????????????? in reorg 2, old: %d, %x, new: %d, %x",
+				bc.currentBlock.NumberU64(), bc.currentBlock.Hash().Bytes()[:8],
+				block.NumberU64(), block.Hash().Bytes()[:8],
+			)
+
+			if err := bc.canReorg(bc.currentBlock, block); err != nil {
+				return NonStatTy, err
+			}
+
 			if err := bc.reorg(bc.currentBlock, block); err != nil {
 				return NonStatTy, err
 			}
@@ -947,16 +968,17 @@ func (bc *BlockChain) WriteBlockAndState(block *types.Block, receipts []*types.R
 // wrong.
 //
 // After insertion is done, all accumulated events will be fired.
-func (bc *BlockChain) InsertChain(chain types.Blocks, liveFlag bool) (int, error) {
-	n, events, logs, err := bc.insertChain(chain, liveFlag)
-	bc.PostChainEvents(events, logs)
+func (bc *BlockChain) InsertChain(chain types.Blocks, liveFlag bool, syncBlock bool) (int, error) {
+	n, events, logs, err := bc.insertChain(chain, liveFlag, syncBlock)
+	//bc.PostChainEvents(events, logs)
+	log.Debugf("%v, %v", events, logs)
 	return n, err
 }
 
 // insertChain will execute the actual chain insertion and event aggregation. The
 // only reason this method exists as a separate one is to make locking cleaner
 // with deferred statements.
-func (bc *BlockChain) insertChain(chain types.Blocks, liveFlag bool) (int, []interface{}, []*types.Log, error) {
+func (bc *BlockChain) insertChain(chain types.Blocks, liveFlag bool, syncBlock bool) (int, []interface{}, []*types.Log, error) {
 	// Do a sanity check that the provided chain is actually ordered and linked
 	for i := 1; i < len(chain); i++ {
 		if chain[i].NumberU64() != chain[i-1].NumberU64()+1 || chain[i].ParentHash() != chain[i-1].Hash() {
@@ -992,7 +1014,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, liveFlag bool) (int, []int
 		headers[i] = block.Header()
 		seals[i] = true
 	}
-	abort, results := bc.engine.VerifyHeaders(bc, headers, seals)
+	abort, results := bc.engine.VerifyHeaders(bc, headers, seals, syncBlock)
 	defer close(abort)
 
 	// Iterate over the blocks and insert when the verifier permits
@@ -1074,8 +1096,17 @@ func (bc *BlockChain) insertChain(chain types.Blocks, liveFlag bool) (int, []int
 			block.NumberU64(), len(block.Transactions()), state.Root(), err,
 		)
 		if err != nil {
+			if err == ErrNoReorg {
+				// if reorg err, rewind to 2 blocks earlier
+				newHead := bc.currentBlock.NumberU64() - 2
+				if newHead < 1 {
+					newHead = 1
+				}
+				bc.SetHead(newHead)
+			}
 			return i, events, coalescedLogs, err
 		}
+
 		switch status {
 		case CanonStatTy:
 			log.Debug("Inserted new block", "number", block.Number(), "hash", block.Hash(), "uncles", len(block.Uncles()),
@@ -1277,12 +1308,15 @@ func (bc *BlockChain) PostChainEvents(events []interface{}, logs []*types.Log) {
 		switch ev := event.(type) {
 		case ChainEvent:
 			bc.chainFeed.Send(ev)
+			//log.Infof("--------------------------------aaaaaaaaaaaaaaaaaaaaa chainfeed")
 
 		case ChainHeadEvent:
 			bc.chainHeadFeed.Send(ev)
+			//log.Infof("--------------------------------bbbbbbbbbbbbbbbbbbbbb chainheadFeed")
 
 		case ChainSideEvent:
 			bc.chainSideFeed.Send(ev)
+			//log.Infof("--------------------------------ccccccccccccccccccccc chainSideFeed")
 		}
 	}
 }
@@ -1351,9 +1385,9 @@ Error: %v
 // should be done or not. The reason behind the optional check is because some
 // of the header retrieval mechanisms already need to verify nonces, as well as
 // because nonces can be verified sparsely, not needing to check each.
-func (bc *BlockChain) InsertHeaderChain(chain []*types.Header, checkFreq int) (int, error) {
+func (bc *BlockChain) InsertHeaderChain(chain []*types.Header, checkFreq int, syncBlock bool) (int, error) {
 	start := time.Now()
-	if i, err := bc.hc.ValidateHeaderChain(chain, checkFreq); err != nil {
+	if i, err := bc.hc.ValidateHeaderChain(chain, checkFreq, syncBlock); err != nil {
 		return i, err
 	}
 
@@ -1472,11 +1506,6 @@ func (bc *BlockChain) SubscribeChainHeadEvent(ch chan<- ChainHeadEvent) event.Su
 	return bc.scope.Track(bc.chainHeadFeed.Subscribe(ch))
 }
 
-// SubscribeBlockGenTimerEvent registers a subscription of BlockGenTimerEvent.
-func (bc *BlockChain) SubscribeBlockGenTimerEvent(ch chan<- BlockGenTimerEvent) event.Subscription {
-	return bc.scope.Track(bc.blockGenTimerFeed.Subscribe(ch))
-}
-
 // SubscribeChainSideEvent registers a subscription of ChainSideEvent.
 func (bc *BlockChain) SubscribeChainSideEvent(ch chan<- ChainSideEvent) event.Subscription {
 	return bc.scope.Track(bc.chainSideFeed.Subscribe(ch))
@@ -1485,4 +1514,68 @@ func (bc *BlockChain) SubscribeChainSideEvent(ch chan<- ChainSideEvent) event.Su
 // SubscribeLogsEvent registers a subscription of []*types.Log.
 func (bc *BlockChain) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription {
 	return bc.scope.Track(bc.logsFeed.Subscribe(ch))
+}
+
+func (bc *BlockChain) canReorg(oldBlock, newBlock *types.Block) error {
+	// Check original Block
+	log.Debugf("in can reorg: old: %d, hash: %x, sig: %v, new: %d, hash: %x, sig: %v",
+		oldBlock.NumberU64(),
+		oldBlock.Hash().Bytes()[:8],
+		oldBlock.SignatureSHA()[:8],
+		newBlock.NumberU64(),
+		newBlock.Hash().Bytes()[:8],
+		newBlock.SignatureSHA()[:8],
+	)
+
+	isVssEnabled := true
+	if isVssEnabled {
+		// if both blocks are the Descendants of the same parents and they are same height
+		if oldBlock.ParentHash() == newBlock.ParentHash() && oldBlock.NumberU64() == newBlock.NumberU64() {
+			// if old.sig > new.sig, i.e. new.sig is smaller
+			if CmpSigs(
+				oldBlock.SignatureSHA(),
+				newBlock.SignatureSHA(),
+			) == 1 {
+				log.Debugf("reorg validated: old: %d, %x, new: %d, %x",
+					oldBlock.NumberU64(),
+					oldBlock.Hash().Bytes(),
+					newBlock.NumberU64(),
+					newBlock.Hash().Bytes(),
+				)
+				return nil
+			}
+		}
+
+		return ErrNoReorg
+	} else {
+		if oldBlock.NumberU64() >= newBlock.NumberU64() {
+			return ErrNoReorg
+		} else {
+			if parent := bc.GetBlock(newBlock.ParentHash(), newBlock.NumberU64()-1); oldBlock.Hash() == parent.Hash() {
+				log.Debugf("in can reorg: pass")
+				return nil
+			} else {
+				log.Debugf("pending block err in reorg()")
+				return ErrNoReorg
+			}
+		}
+	}
+}
+
+// compare two bls signatures, 1: > , 0: = , -1: <
+func CmpSigs(sig1, sig2 []byte) int {
+	if len(sig1) != len(sig2) {
+		return 1
+	}
+
+	for i, b1 := range sig1 {
+		b2 := sig2[i]
+		if uint8(b1) > uint8(b2) {
+			return 1
+		} else if uint8(b1) < uint8(b2) {
+			return -1
+		}
+	}
+
+	return 0
 }

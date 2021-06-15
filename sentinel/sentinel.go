@@ -107,7 +107,7 @@ func (sentinel *Sentinel) start() {
 	lastBlock := uint64(0)
 	for {
 		time.Sleep(10 * time.Second)
-		log.Infof("This is sentinel: [[      ***  %d  ***      ]]", lastBlock)
+		log.Debugf("This is sentinel: [[      ***  %d  ***      ]]", lastBlock)
 		sentinel.PrintVaultEventsReceived()
 
 		// init rpc client
@@ -133,7 +133,7 @@ func (sentinel *Sentinel) start() {
 			Start:   lastBlock,
 			End:     &currentBlock,
 		}
-		log.Infof("sentinel: start %d, end: %d", lastBlock, currentBlock)
+		log.Debugf("sentinel: start %d, end: %d", lastBlock, currentBlock)
 		itr, err := vaultx.FilterTokenDeposit(
 			filterOpts,
 			[]common.Address{},
@@ -163,7 +163,6 @@ func (sentinel *Sentinel) start() {
 			// broad cast to other nodes
 			sentinel.vaultEventFeed.Send(vaultEvent)
 		}
-
 		lastBlock = currentBlock
 	}
 }

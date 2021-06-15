@@ -342,7 +342,8 @@ func (api *PrivateAdminAPI) ImportChain(file string) (bool, error) {
 		}
 		// Import the batch and reset the buffer
 		liveFlag := false
-		if _, err := api.mc.BlockChain().InsertChain(blocks, liveFlag); err != nil {
+		syncBlock := true
+		if _, err := api.mc.BlockChain().InsertChain(blocks, liveFlag, syncBlock); err != nil {
 			return false, fmt.Errorf("batch %d: failed to insert: %v", batch, err)
 		}
 		blocks = blocks[:0]
@@ -499,7 +500,8 @@ func (api *PrivateDebugAPI) traceBlock(block *types.Block, logConfig *vm.LogConf
 		Debug:  true,
 		Tracer: structLogger,
 	}
-	if err := api.mc.engine.VerifyHeader(blockchain, block.Header(), true); err != nil {
+	syncBlock := false
+	if err := api.mc.engine.VerifyHeader(blockchain, block.Header(), true, syncBlock); err != nil {
 		return false, structLogger.StructLogs(), err
 	}
 	parent := blockchain.GetBlock(block.ParentHash(), block.NumberU64()-1)

@@ -85,6 +85,7 @@ func (mux *TypeMux) Post(ev interface{}) error {
 		Time: time.Now(),
 		Data: ev,
 	}
+
 	rtyp := reflect.TypeOf(ev)
 	mux.mutex.RLock()
 	if mux.stopped {
