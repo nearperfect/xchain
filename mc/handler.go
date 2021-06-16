@@ -1204,7 +1204,6 @@ func (pm *ProtocolManager) handleMainnetMsg(p *Peer, msg p2p.Msg) error {
 		}
 
 		for _, event := range vaultEvents {
-			pm.sentinel.MarkVaultEvent(event)
 			p.MarkVaultEvent(event.Hash())
 		}
 

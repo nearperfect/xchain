@@ -933,7 +933,7 @@ func (d *Downloader) fillHeaderSkeleton(from uint64, skeleton []*types.Header) (
 // and also periodically checking for timeouts.
 func (d *Downloader) fetchBodies(from uint64) error {
 	log.Debug("Downloading block bodies", "origin", from)
-	log.Infof("fetch bodies ------------------------------------------------------------------------ %d", from)
+	log.Infof("fetch bodies ------------------------------------------------------------------------ from %d", from)
 
 	var (
 		deliver = func(packet dataPack) (int, error) {

@@ -132,6 +132,10 @@ var (
 	vnodeConfigFlags = []cli.Flag{
 		utils.VnodeConfigFlag,
 	}
+
+	vaultsConfigFlags = []cli.Flag{
+		utils.VaultsConfigFlag,
+	}
 )
 
 func init() {
@@ -173,6 +177,7 @@ func init() {
 	app.Flags = append(app.Flags, debug.Flags...)
 	//Add custom flags
 	app.Flags = append(app.Flags, vnodeConfigFlags...)
+	app.Flags = append(app.Flags, vaultsConfigFlags...)
 
 	app.Before = func(ctx *cli.Context) error {
 		runtime.GOMAXPROCS(runtime.NumCPU())

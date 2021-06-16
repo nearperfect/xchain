@@ -492,7 +492,7 @@ func (pos *Pos) NewVnodeBlockLoop() {
 	if interval < params.MinVSSRunInterval {
 		interval = params.MinVSSRunInterval
 	}
-	log.Debugf("New vnode block loop, run every %d seconds", interval)
+	log.Infof("New vnode block loop, run every %d seconds", interval)
 	t := time.NewTicker(time.Duration(int(interval)) * time.Second)
 	defer t.Stop()
 	defer log.Debugf("new vnode block loop exits")
@@ -500,7 +500,7 @@ func (pos *Pos) NewVnodeBlockLoop() {
 	for {
 		<-t.C
 		currentVnodeBlockNumber, _ := pos.client.BlockNumber(context.Background())
-		log.Debugf("new vnode block loop block number = %d", currentVnodeBlockNumber)
+		log.Infof("----------- New vnode block number = %d", currentVnodeBlockNumber)
 		if currentVnodeBlockNumber > lastBlock {
 			SlowNodeChan <- currentVnodeBlockNumber
 			RevealedShareChan <- currentVnodeBlockNumber

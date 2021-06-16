@@ -71,7 +71,12 @@ type Pos struct {
 // New creates a full sized pos PoW scheme.
 func New(cfg *config.Configuration, vssid common.Address, key *keystore.Key) *Pos {
 	url := fmt.Sprintf("http://%s:%s", cfg.VnodeIP, cfg.VnodePort)
-	client, _ := mcclient.Dial(url)
+	client, err := mcclient.Dial(url)
+	if err != nil {
+		log.Errorf("Can not get vnode client with config: %s", url)
+	} else {
+		log.Infof("Get vnode client with config: %s", url)
+	}
 	vssbase, _ := xdefi.NewVssBase(
 		common.HexToAddress(cfg.VssBaseAddr),
 		client,
@@ -107,13 +112,13 @@ func New(cfg *config.Configuration, vssid common.Address, key *keystore.Key) *Po
 
 	// vss config loop
 	if pos.vssEnabled {
-		log.Debugf("vss enabled, ready to run vss loop")
+		log.Infof("vss enabled, ready to run vss loop")
 		// init vsskey
 		pos.LoadVSSKey()
-		go pos.HandleSigShares()     // handle sig shares
+		go pos.NewVnodeBlockLoop()   // for checking new block in vnode
 		go pos.VssStateLoop()        // for updating config
 		go pos.VssUploadConfigLoop() // for uploading config
-		go pos.NewVnodeBlockLoop()   // for checking new block in vnode
+		go pos.HandleSigShares()     // handle sig shares
 		//go pos.VssSlashingLoop()     // for checking slash
 	}
 

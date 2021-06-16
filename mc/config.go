@@ -31,6 +31,7 @@ import (
 	"github.com/MOACChain/xchain/core"
 	"github.com/MOACChain/xchain/mc/downloader"
 	"github.com/MOACChain/xchain/mc/gasprice"
+	"github.com/MOACChain/xchain/sentinel"
 	vnodeconfig "github.com/MOACChain/xchain/vnode/config"
 )
 
@@ -55,7 +56,8 @@ var DefaultConfig = Config{
 		Blocks:     10,
 		Percentile: 50,
 	},
-	VnodeConfigPath: "./vnodeconfig.json",
+	VnodeConfigPath:  "./vnodeconfig.json",
+	VaultsConfigPath: "./vaults.json",
 }
 
 func init() {
@@ -128,6 +130,10 @@ type Config struct {
 	// Vnode config
 	VnodeConfigPath string
 	VnodeConfig     *vnodeconfig.Configuration
+
+	// vaults
+	VaultsConfigPath string
+	VaultsConfig     *sentinel.VaultPairListConfig
 }
 
 type configMarshaling struct {

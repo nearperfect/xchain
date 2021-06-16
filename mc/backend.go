@@ -166,7 +166,7 @@ func New(ctx *node.ServiceContext, config *Config) (*MoacService, error) {
 	mcSrv.txPool = core.NewTxPool(config.TxPool, mcSrv.chainConfig, mcSrv.blockchain)
 
 	// sentinel for vault
-	mcSrv.sentinel = sentinel.New(mcSrv.BlockChain())
+	mcSrv.sentinel = sentinel.New(mcSrv.BlockChain(), mcSrv.config.VaultsConfig, chainDb, mcSrv.engine.(*pos.Pos))
 	log.Infof("sentinel ********** %v", mcSrv.sentinel)
 
 	log.Debugf("create new protocol manager")

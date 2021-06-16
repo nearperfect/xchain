@@ -52,6 +52,7 @@ import (
 	"github.com/MOACChain/xchain/p2p/nat"
 	"github.com/MOACChain/xchain/p2p/netutil"
 	vnodeParams "github.com/MOACChain/xchain/params"
+	"github.com/MOACChain/xchain/sentinel"
 	vnodeconfig "github.com/MOACChain/xchain/vnode/config"
 )
 
@@ -472,6 +473,12 @@ var (
 		Usage: "vnodeconfig file path",
 		Value: mc.DefaultConfig.VnodeConfigPath,
 	}
+	// Vaults config setttings for sentinel service
+	VaultsConfigFlag = cli.StringFlag{
+		Name:  "vaultxconfig",
+		Usage: "vaultxconfig file path",
+		Value: mc.DefaultConfig.VaultsConfigPath,
+	}
 )
 
 // MakeDataDir retrieves the currently requested data directory, terminating
@@ -716,8 +723,21 @@ func setXchainBase(ctx *cli.Context, cfg *mc.Config) {
 	cfg.XchainKey = key
 }
 
-// setMoacbase retrieves the moacbase either from the directly specified
-// command line flags or from the keystore if CLI indexed.
+// setVaultsConfig sets the path for the vaults config file
+func setVaultsConfig(ctx *cli.Context, cfg *mc.Config) {
+	vaultsConfigPath := mc.DefaultConfig.VaultsConfigPath
+	if ctx.GlobalIsSet(VaultsConfigFlag.Name) {
+		vaultsConfigPath = VaultsConfigFlag.Name
+	}
+	var err error
+	if cfg.VaultsConfig, err = sentinel.GetConfiguration(vaultsConfigPath); err != nil {
+		log.Errorf("Error loading vnode config: %s", vaultsConfigPath)
+	} else {
+		log.Infof("Vaults: %v", cfg.VaultsConfig)
+	}
+}
+
+// setVnodeConfig sets the path for vnode config file
 func setVnodeConfig(ctx *cli.Context, cfg *mc.Config) {
 	vnodeConfigPath := mc.DefaultConfig.VnodeConfigPath
 	if ctx.GlobalIsSet(VnodeConfigFlag.Name) {
@@ -945,6 +965,7 @@ func SetMoacConfig(ctx *cli.Context, n *node.Node, cfg *mc.Config) {
 
 	ks := n.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
 	setVnodeConfig(ctx, cfg)
+	setVaultsConfig(ctx, cfg)
 	setMoacbase(ctx, ks, cfg)
 	setXchainBase(ctx, cfg)
 	setGPO(ctx, &cfg.GPO)
