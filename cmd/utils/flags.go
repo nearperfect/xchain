@@ -260,6 +260,11 @@ var (
 		Value: int(state.MaxTrieCacheGen),
 	}
 	// Miner settings
+	MiningEnabledFlag = cli.BoolFlag{
+		Name:  "mine",
+		Usage: "Enable mining",
+	}
+	// Miner settings
 	MinerThreadsFlag = cli.IntFlag{
 		Name:  "minerthreads",
 		Usage: "Number of CPU threads to use for mining",

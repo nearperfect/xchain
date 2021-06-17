@@ -970,7 +970,7 @@ func (bc *BlockChain) WriteBlockAndState(block *types.Block, receipts []*types.R
 // After insertion is done, all accumulated events will be fired.
 func (bc *BlockChain) InsertChain(chain types.Blocks, liveFlag bool, syncBlock bool) (int, error) {
 	n, events, logs, err := bc.insertChain(chain, liveFlag, syncBlock)
-	//bc.PostChainEvents(events, logs)
+	bc.PostChainEvents(events, logs)
 	log.Debugf("%v, %v", events, logs)
 	return n, err
 }

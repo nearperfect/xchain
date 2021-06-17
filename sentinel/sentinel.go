@@ -25,8 +25,8 @@ import (
 	"github.com/MOACChain/MoacLib/log"
 	"github.com/MOACChain/MoacLib/mcdb"
 	"github.com/MOACChain/xchain/accounts/abi/bind"
-	"github.com/MOACChain/xchain/consensus/pos"
 	"github.com/MOACChain/xchain/core"
+	"github.com/MOACChain/xchain/dkg"
 	"github.com/MOACChain/xchain/event"
 	"github.com/MOACChain/xchain/mcclient"
 	"github.com/MOACChain/xchain/mcclient/xdefi"
@@ -46,7 +46,7 @@ type Sentinel struct {
 	config         *config.Configuration
 	vaultsConfig   *VaultPairListConfig
 	db             mcdb.Database
-	pos            *pos.Pos
+	dkg            *dkg.DKG
 
 	// vault events
 	VaultEventsReceived  map[common.Hash]int
@@ -66,7 +66,7 @@ type TokenMapping struct {
 	MappedChainid *big.Int
 }
 
-func New(bc *core.BlockChain, vaultsConfig *VaultPairListConfig, db mcdb.Database, engine *pos.Pos) *Sentinel {
+func New(bc *core.BlockChain, vaultsConfig *VaultPairListConfig, db mcdb.Database, dkg *dkg.DKG) *Sentinel {
 	sentinel := &Sentinel{
 		db:                   db,
 		chainHeadCh:          make(chan core.ChainHeadEvent, 10),
@@ -78,7 +78,7 @@ func New(bc *core.BlockChain, vaultsConfig *VaultPairListConfig, db mcdb.Databas
 		vaultsConfig:         vaultsConfig,
 		VaultEventsChanXY:    make(map[int](chan *core.VaultEvent)),
 		VaultEventsChanYX:    make(map[int](chan *core.VaultEvent)),
-		pos:                  engine,
+		dkg:                  dkg,
 	}
 	sentinel.scope.Open()
 	sentinel.chainHeadSub = bc.SubscribeChainHeadEvent(sentinel.chainHeadCh)
@@ -252,8 +252,8 @@ func (sentinel *Sentinel) callWithdraw(queue chan *core.VaultEvent) {
 }
 
 func (sentinel *Sentinel) threshold() int {
-	if sentinel.pos.IsVSSReady() {
-		return sentinel.pos.Bls.Threshold
+	if sentinel.dkg.IsVSSReady() {
+		return sentinel.dkg.Bls.Threshold
 	} else {
 		return 0
 	}
@@ -262,11 +262,11 @@ func (sentinel *Sentinel) threshold() int {
 func (sentinel *Sentinel) start() {
 	for {
 		time.Sleep(VssCheckInterval * time.Second)
-		if sentinel.pos.IsVSSReady() {
+		if sentinel.dkg.IsVSSReady() {
 			break
 		}
 	}
-	log.Infof("In sentinel start(): vss is ready, t=%d", sentinel.pos.Bls.Threshold)
+	log.Infof("In sentinel start(): vss is ready, t=%d", sentinel.dkg.Bls.Threshold)
 	// create all go routines for watching vault contracts on various blockchains
 	for pairIndex, vaultPairConfig := range sentinel.vaultsConfig.Vaults {
 		pairId := vaultPairConfig.Id()

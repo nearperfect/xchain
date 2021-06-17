@@ -38,9 +38,9 @@ import (
 	"github.com/MOACChain/xchain/accounts"
 	"github.com/MOACChain/xchain/consensus"
 	"github.com/MOACChain/xchain/consensus/ethash"
-	"github.com/MOACChain/xchain/consensus/pos"
 	"github.com/MOACChain/xchain/core"
 	"github.com/MOACChain/xchain/core/bloombits"
+	"github.com/MOACChain/xchain/dkg"
 	"github.com/MOACChain/xchain/event"
 	"github.com/MOACChain/xchain/internal/mcapi"
 	"github.com/MOACChain/xchain/mc/downloader"
@@ -88,6 +88,9 @@ type MoacService struct {
 
 	//sentinel, monitor events from target chains
 	sentinel *sentinel.Sentinel
+
+	// dkg, for distributed key generation and bls
+	dkg *dkg.DKG
 }
 
 func GetInstance() *MoacService {
@@ -165,8 +168,11 @@ func New(ctx *node.ServiceContext, config *Config) (*MoacService, error) {
 	// txpool
 	mcSrv.txPool = core.NewTxPool(config.TxPool, mcSrv.chainConfig, mcSrv.blockchain)
 
+	mcSrv.dkg = dkg.New(config.VnodeConfig, config.XchainId, config.XchainKey)
+	log.Infof("DKG ********** %v", mcSrv.dkg)
+
 	// sentinel for vault
-	mcSrv.sentinel = sentinel.New(mcSrv.BlockChain(), mcSrv.config.VaultsConfig, chainDb, mcSrv.engine.(*pos.Pos))
+	mcSrv.sentinel = sentinel.New(mcSrv.BlockChain(), mcSrv.config.VaultsConfig, chainDb, mcSrv.dkg)
 	log.Infof("sentinel ********** %v", mcSrv.sentinel)
 
 	log.Debugf("create new protocol manager")
@@ -177,6 +183,7 @@ func New(ctx *node.ServiceContext, config *Config) (*MoacService, error) {
 		mcSrv.eventMux,
 		mcSrv.txPool,
 		mcSrv.sentinel,
+		mcSrv.dkg,
 		mcSrv.engine,
 		mcSrv.blockchain,
 		chainDb,
@@ -274,13 +281,11 @@ func CreateConsensusEngine(ctx *node.ServiceContext, config *Config, chainConfig
 		log.Warn("Ethash used in shared mode")
 		return ethash.NewShared()
 	default:
-		/*
-						engine := ethash.New(ctx.ResolvePath(config.EthashCacheDir), config.EthashCachesInMem, config.EthashCachesOnDisk,
-							config.EthashDatasetDir, config.EthashDatasetsInMem, config.EthashDatasetsOnDisk)
-						engine.SetThreads(-1) // Disable CPU mining
-			            return engine
-		*/
-		return pos.New(config.VnodeConfig, config.XchainId, config.XchainKey)
+		engine := ethash.New(ctx.ResolvePath(config.EthashCacheDir), config.EthashCachesInMem, config.EthashCachesOnDisk,
+			config.EthashDatasetDir, config.EthashDatasetsInMem, config.EthashDatasetsOnDisk)
+		engine.SetThreads(-1) // Disable CPU mining
+		return engine
+		//return pos.New(config.VnodeConfig, config.XchainId, config.XchainKey)
 	}
 }
 

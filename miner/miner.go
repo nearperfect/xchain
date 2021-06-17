@@ -55,7 +55,7 @@ type Miner struct {
 }
 
 func New(mc Backend, config *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine) *Miner {
-	worker := NewWorker(config, engine, common.Address{}, mc, mux)
+	worker := newWorker(config, engine, common.Address{}, mc, mux)
 	miner := &Miner{
 		mc:       mc,
 		mux:      mux,

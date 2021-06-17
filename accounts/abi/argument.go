@@ -79,7 +79,7 @@ func (arguments Arguments) isTuple() bool {
 func (arguments Arguments) Unpack(data []byte) ([]interface{}, error) {
 	if len(data) == 0 {
 		if len(arguments) != 0 {
-			return nil, fmt.Errorf("abi: attempting to unmarshall an empty string while arguments are expected")
+			return nil, fmt.Errorf("abi: attempting to unmarshall an empty string while arguments are expected. Possible tx revert or evm excution error.")
 		}
 		// Nothing to unmarshal, return default variables
 		nonIndexedArgs := arguments.NonIndexed()
@@ -100,7 +100,7 @@ func (arguments Arguments) UnpackIntoMap(v map[string]interface{}, data []byte) 
 	}
 	if len(data) == 0 {
 		if len(arguments) != 0 {
-			return fmt.Errorf("abi: attempting to unmarshall an empty string while arguments are expected")
+			return fmt.Errorf("abi: attempting to unmarshall an empty string while arguments are expected. Possible tx revert or evm excution error.")
 		}
 		return nil // Nothing to unmarshal, return
 	}

@@ -93,7 +93,9 @@ func main() {
 		panic(err)
 	}
 	fmt.Println("const devAllocData =", makealloc(g))
+
 	return
+
 	//Prepare an output file and send the RLP encoded string
 	//This file need to be put into existing genesis_alloc.go
 	//to be used

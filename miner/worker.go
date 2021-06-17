@@ -262,7 +262,6 @@ func (self *worker) update() {
 					self.chain,
 					self.coinbase,
 					self.mc,
-					nil,
 				)
 				self.currentMu.Unlock()
 			}
@@ -439,9 +438,9 @@ func (self *worker) commitNewWork() {
 	txs := []*types.TransactionsByPriceAndNonce{txsH, txsL}
 
 	if atomic.LoadInt32(&self.mining) == 0 {
-		work.commitTransactions(self.mux, txs, self.chain, self.coinbase, self.mc, nil)
+		work.commitTransactions(self.mux, txs, self.chain, self.coinbase, self.mc)
 	} else {
-		work.commitTransactions(self.mux, txs, self.chain, self.coinbase, self.mc, self.nr)
+		work.commitTransactions(self.mux, txs, self.chain, self.coinbase, self.mc)
 	}
 	// compute uncles for the new block.
 	var (

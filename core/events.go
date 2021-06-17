@@ -22,7 +22,7 @@ import (
 
 	"github.com/MOACChain/MoacLib/common"
 	"github.com/MOACChain/MoacLib/types"
-	"github.com/MOACChain/xchain/consensus/pos"
+	"github.com/MOACChain/xchain/dkg"
 )
 
 // TxPreEvent is posted when a transaction enters the transaction pool.
@@ -43,7 +43,7 @@ type PendingStateEvent struct{}
 type NewMinedBlockEvent struct{ Block *types.Block }
 
 // NewSigShareEvent is
-type NewSigShareEvent struct{ SigShare *pos.SigShareMessage }
+type NewSigShareEvent struct{ SigShare *dkg.SigShareMessage }
 
 // RemovedTransactionEvent is posted when a reorg happens
 type RemovedTransactionEvent struct{ Txs types.Transactions }
@@ -65,7 +65,7 @@ type ChainHeadEvent struct{ Block *types.Block }
 
 type TxShardJoinEvent struct{ Tx *types.Transaction }
 
-type SigShares []*pos.SigShareMessage
+type SigShares []*dkg.SigShareMessage
 
 type VaultEvents []*VaultEvent
 

@@ -35,15 +35,14 @@ import (
 	"github.com/MOACChain/MoacLib/rlp"
 	"github.com/MOACChain/MoacLib/types"
 	"github.com/MOACChain/xchain/consensus"
-	"github.com/MOACChain/xchain/consensus/pos"
 	"github.com/MOACChain/xchain/core"
+	"github.com/MOACChain/xchain/dkg"
 	"github.com/MOACChain/xchain/event"
 	"github.com/MOACChain/xchain/mc/downloader"
 	"github.com/MOACChain/xchain/mc/fetcher"
 	"github.com/MOACChain/xchain/node"
 	"github.com/MOACChain/xchain/p2p"
 	"github.com/MOACChain/xchain/p2p/discover"
-	xparams "github.com/MOACChain/xchain/params"
 	"github.com/MOACChain/xchain/sentinel"
 	gocache "github.com/patrickmn/go-cache"
 )
@@ -115,6 +114,7 @@ type ProtocolManager struct {
 	acceptTxs       uint32 // Flag whether we're considered synchronised (enables transaction processing)
 	txpool          txPool
 	sentinel        *sentinel.Sentinel
+	dkg             *dkg.DKG
 	engine          consensus.Engine
 	blockchain      *core.BlockChain
 	chaindb         mcdb.Database
@@ -189,6 +189,7 @@ func NewProtocolManager(
 	mux *event.TypeMux,
 	txpool txPool,
 	sentinel *sentinel.Sentinel,
+	dkg *dkg.DKG,
 	engine consensus.Engine,
 	blockchain *core.BlockChain,
 	chaindb mcdb.Database,
@@ -199,6 +200,7 @@ func NewProtocolManager(
 		eventMux:          mux,
 		txpool:            txpool,
 		sentinel:          sentinel,
+		dkg:               dkg,
 		engine:            engine,
 		blockchain:        blockchain,
 		chaindb:           chaindb,
@@ -1208,36 +1210,36 @@ func (pm *ProtocolManager) handleMainnetMsg(p *Peer, msg p2p.Msg) error {
 		}
 
 	case msg.Code == SigShareMsg:
-		var sigShares []*pos.SigShareMessage
+		var sigShares []*dkg.SigShareMessage
 		// Parse all vault events
 		if err := msg.Decode(&sigShares); err != nil {
 			return ErrResp(ErrDecode, "sig shares msg parse error: %v: %v", msg, err)
 		}
 
-		var sigShare *pos.SigShareMessage
+		var sigShare *dkg.SigShareMessage
 		for _, sigShare = range sigShares {
-			pos := pm.engine.(*pos.Pos)
-			pos.Vss.SigShareChan <- sigShare
+			pm.dkg.Vss.SigShareChan <- sigShare
 			p.MarkSigShare(sigShare.Hash())
 			log.Infof("  sig share received !!!!!!!!!!!!! %s", sigShare.Key())
 		}
 
-		// force sync if last sigshare's remote peer has higher block
-		currentBlock := pm.blockchain.CurrentBlock()
-		remotePeerBlockNumber := sigShare.BlockNumber.Int64() - 1
-		remotePeerDifficulty := new(big.Int).Add(
-			xparams.PosBaseDifficulty,
-			new(big.Int).Mul(xparams.PosDifficultyPerBlock, big.NewInt(remotePeerBlockNumber)),
-		)
-		p.SetHead(common.BytesToHash(sigShare.BlockHash), remotePeerDifficulty)
-		log.Infof(
-			"  sig share peer sethead !!!!!!!!!!!!! peer.id: %v, hash: %x, TD: %d, blockNumber: %d",
-			p.id, sigShare.BlockHash[:8], remotePeerDifficulty, big.NewInt(remotePeerBlockNumber),
-		)
-		if remotePeerBlockNumber-currentBlock.Number().Int64() > 1 {
-			ignoreTD := false
-			go pm.synchronise(p, ignoreTD)
-		}
+		/*
+			// force sync if last sigshare's remote peer has higher block
+			currentBlock := pm.blockchain.CurrentBlock()
+			remotePeerBlockNumber := sigShare.BlockNumber.Int64() - 1
+			remotePeerDifficulty := new(big.Int).Add(
+				xparams.PosBaseDifficulty,
+				new(big.Int).Mul(xparams.PosDifficultyPerBlock, big.NewInt(remotePeerBlockNumber)),
+			)
+			p.SetHead(common.BytesToHash(sigShare.BlockHash), remotePeerDifficulty)
+			log.Infof(
+				"  sig share peer sethead !!!!!!!!!!!!! peer.id: %v, hash: %x, TD: %d, blockNumber: %d",
+				p.id, sigShare.BlockHash[:8], remotePeerDifficulty, big.NewInt(remotePeerBlockNumber),
+			)
+			if remotePeerBlockNumber-currentBlock.Number().Int64() > 1 {
+				ignoreTD := false
+				go pm.synchronise(p, ignoreTD)
+			}*/
 
 	case msg.Code == ScsMsg:
 		var scsMsg pb.ScsPushMsg
@@ -1270,7 +1272,7 @@ func (pm *ProtocolManager) handleMainnetMsg(p *Peer, msg p2p.Msg) error {
 
 // BroadcastBlock will either propagate a block to a subset of it's peers, or
 // will only announce it's availability (depending what's requested).
-func (pm *ProtocolManager) BroadcastSigShare(sigShare *pos.SigShareMessage) {
+func (pm *ProtocolManager) BroadcastSigShare(sigShare *dkg.SigShareMessage) {
 	hash := sigShare.Hash()
 	peerSet := pm.p2pManager.peerSet
 	peers := peerSet.PeersWithoutSigShare(hash)

@@ -354,7 +354,7 @@ func MainnetGenesisBlock() *Genesis {
 		Nonce:      0x42,
 		ExtraData:  hexutil.MustDecode("0x31393639415250414e4554373354435049503039425443323031384d4f4143"),
 		GasLimit:   uint64(params.GenesisGasLimit.Int64()), //5000,
-		Difficulty: big.NewInt(0x174876E800),
+		Difficulty: big.NewInt(0x1000),
 		Alloc:      decodePrealloc(mainnetAllocData),
 	}
 }
