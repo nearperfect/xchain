@@ -336,15 +336,17 @@ func (pm *ProtocolManager) removePeer(id string, subnet string) {
 func (pm *ProtocolManager) Start(maxPeers int) {
 	pm.p2pManager.maxPeers = maxPeers
 
-	// broadcast vault events
-	pm.vaultEventCh = make(chan core.VaultEvent, vaultEventChanSize)
-	pm.vaultEventSub = pm.sentinel.SubscribeVaultEvent(pm.vaultEventCh)
 	// broadcast transactions
 	pm.txCh = make(chan core.TxPreEvent, txChanSize)
 	pm.txSub = pm.txpool.SubscribeTxPreEvent(pm.txCh)
+
 	// broadcast sharding transactions
 	pm.shardingTxCh = make(chan core.ShardingTxEvent, shardingTxChanSize)
 	pm.shardingTxSub = pm.txpool.SubscribeShardingTxEvent(pm.shardingTxCh)
+
+	// broadcast vault events
+	pm.vaultEventCh = make(chan core.VaultEvent, vaultEventChanSize)
+	pm.vaultEventSub = pm.sentinel.SubscribeVaultEvent(pm.vaultEventCh)
 
 	// broadcast tx
 	go pm.txBroadcastLoop()
@@ -1176,6 +1178,21 @@ func (pm *ProtocolManager) handleMainnetMsg(p *Peer, msg p2p.Msg) error {
 			p.MarkTransaction(tx.Hash())
 		}
 		pm.txpool.AddRemotes(txs)
+
+	case msg.Code == VaultEventMsg:
+		log.Infof("  vault event received !!!!!!!!!!!!!!")
+		var vaultEvents []*core.VaultEvent
+		// Parse all vault events
+		if err := msg.Decode(&vaultEvents); err != nil {
+			return ErrResp(ErrDecode, "vault events msg parse error: %v: %v", msg, err)
+		}
+		for _, event := range vaultEvents {
+			pm.sentinel.MarkVaultEvent(event)
+		}
+
+		for _, event := range vaultEvents {
+			p.MarkVaultEvent(event.Hash())
+		}
 
 	case msg.Code == ScsMsg:
 		var scsMsg pb.ScsPushMsg

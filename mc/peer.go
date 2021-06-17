@@ -99,21 +99,22 @@ func newPeer(version int, p *p2p.Peer, rw p2p.MsgReadWriter) *Peer {
 	id := p.ID()
 
 	return &Peer{
-		Peer:             p,
-		rw:               rw,
-		version:          version,
-		id:               fmt.Sprintf("%x", id[:8]),
-		knownTxs:         set.New(),
-		knownBlocks:      set.New(),
-		knownMsgs:        set.New(),
-		knownVaultEvents: set.New(),
-		queuedTxs:        make(chan types.Transactions, maxQueuedTxs),
-		queuedProps:      make(chan *propEvent, maxQueuedProps),
-		queuedAnns:       make(chan *types.Block, maxQueuedAnns),
-		queuedMsgs:       make(chan *pb.ScsPushMsg, maxQueuedMsgs),
-		queuedRes:        make(chan *pb.ScsPushMsg, maxQueuedRes),
-		term:             make(chan struct{}),
-		subnet:           p.Subnet(),
+		Peer:              p,
+		rw:                rw,
+		version:           version,
+		id:                fmt.Sprintf("%x", id[:8]),
+		knownTxs:          set.New(),
+		knownBlocks:       set.New(),
+		knownMsgs:         set.New(),
+		knownVaultEvents:  set.New(),
+		queuedTxs:         make(chan types.Transactions, maxQueuedTxs),
+		queuedVaultEvents: make(chan core.VaultEvents, maxQueuedVaultEvents),
+		queuedProps:       make(chan *propEvent, maxQueuedProps),
+		queuedAnns:        make(chan *types.Block, maxQueuedAnns),
+		queuedMsgs:        make(chan *pb.ScsPushMsg, maxQueuedMsgs),
+		queuedRes:         make(chan *pb.ScsPushMsg, maxQueuedRes),
+		term:              make(chan struct{}),
+		subnet:            p.Subnet(),
 	}
 }
 
@@ -224,7 +225,7 @@ func (p *Peer) MarkTransaction(hash common.Hash) {
 	p.knownTxs.Add(hash)
 }
 
-// MarkTransaction marks a transaction as known for the Peer, ensuring that it
+// MarkVaultEvent marks a vault event as known for the Peer, ensuring that it
 // will never be propagated to this particular Peer.
 func (p *Peer) MarkVaultEvent(hash common.Hash) {
 	// If we reached the memory allowance, drop a previously known vault event hash

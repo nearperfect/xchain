@@ -1,1 +1,1 @@
-{"vaults":[{"vaultx":{"id":56,"rpc":"https://data-seed-prebsc-2-s3.binance.org:8545","prefix":"eth","address":"0xABE1A1A941C9666ac221B041aC1cFE6167e1F1D0"},"vaulty":{"id":95125,"rpc":"http://172.20.0.11:8545","prefix":"mc","address":"0x1B041aC1cFE6167e1F1D0ABE1A1A941C9666ac22"}}]}
+{"vaults":[{"vaultx":{"id":95125,"rpc":"http://172.21.0.11:8545","prefix":"mc","address":"0xABE1A1A941C9666ac221B041aC1cFE6167e1F1D0"},"vaulty":{"id":95125,"rpc":"http://172.20.0.11:8545","prefix":"mc","address":"0x1B041aC1cFE6167e1F1D0ABE1A1A941C9666ac22"}}]}

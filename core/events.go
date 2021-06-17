@@ -70,6 +70,7 @@ type SigShares []*dkg.SigShareMessage
 type VaultEvents []*VaultEvent
 
 type VaultEvent struct {
+	Vault         common.Address `json:"vault"  gencodec:"required"`
 	SourceChainid *big.Int       `json:"sourcechainid"  gencodec:"required"`
 	SourceToken   common.Address `json:"sourcetoken"    gencodec:"required"`
 	MappedChainid *big.Int       `json:"mappedchainid"  gencodec:"required"`
@@ -86,7 +87,8 @@ func (vaultEvent *VaultEvent) Hash() common.Hash {
 
 func (vaultEvent *VaultEvent) String() string {
 	return fmt.Sprintf(
-		"source[%s]: %x, mapped[%s]: %x, account: %x, amount: %s",
+		"vault[%x], source[%s]: %x, mapped[%s]: %x, account: %x, amount: %s",
+		vaultEvent.Vault.Bytes()[:8],
 		vaultEvent.SourceChainid,
 		vaultEvent.SourceToken.Bytes()[:8],
 		vaultEvent.MappedToken,

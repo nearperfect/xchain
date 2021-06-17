@@ -60,6 +60,7 @@ type Sentinel struct {
 }
 
 type TokenMapping struct {
+	Vault         common.Address
 	SourceAddress common.Address
 	SourceChainid *big.Int
 	MappedAddress common.Address
@@ -84,7 +85,7 @@ func New(bc *core.BlockChain, vaultsConfig *VaultPairListConfig, db mcdb.Databas
 	sentinel.chainHeadSub = bc.SubscribeChainHeadEvent(sentinel.chainHeadCh)
 	log.Infof("sentinel start with config: %v", sentinel.vaultsConfig)
 	go sentinel.watchNewBlock()
-	//go sentinel.start()
+	go sentinel.start()
 
 	return sentinel
 }
@@ -104,7 +105,7 @@ func (sentinel *Sentinel) PrintVaultEventsReceived() {
 	}
 }
 
-func (sentinel *Sentinel) MarkVaultEvent(vaultContract common.Address, vaultEvent *core.VaultEvent) {
+func (sentinel *Sentinel) MarkVaultEvent(vaultEvent *core.VaultEvent) {
 	// keep count of the event
 	sentinel.VaultEventsReceived[vaultEvent.Hash()] += 1
 	sentinel.VaultEvents[vaultEvent.Hash()] = vaultEvent
@@ -112,6 +113,7 @@ func (sentinel *Sentinel) MarkVaultEvent(vaultContract common.Address, vaultEven
 	// update VaultEventsNonce
 	nonce := vaultEvent.Nonce
 	tokenMapping := TokenMapping{
+		vaultEvent.Vault,
 		vaultEvent.SourceToken,
 		vaultEvent.SourceChainid,
 		vaultEvent.MappedToken,
@@ -135,8 +137,10 @@ func (sentinel *Sentinel) watchDeposit(
 	vaultContract common.Address,
 	queue chan *core.VaultEvent,
 ) {
+	defer log.Infof("**************END WATCH DEPOSIT*****************************")
 	lastBlock := uint64(0)
 	for {
+		// #1 sleep
 		time.Sleep(VaultCheckInterval * time.Second)
 		log.Infof(
 			"This is sentinel for chain[%d], vault X [0x%x]: [[      ***  %d  ***      ]]",
@@ -144,6 +148,7 @@ func (sentinel *Sentinel) watchDeposit(
 		)
 		sentinel.PrintVaultEventsReceived()
 
+		// #2 prepare client
 		client, err := mcclient.Dial(chainRPC)
 		if err != nil {
 			log.Errorf("Unable to connect to network:%v\n", err)
@@ -152,23 +157,36 @@ func (sentinel *Sentinel) watchDeposit(
 		client.SetFuncPrefix(chainFuncPrefix)
 		// sanity check chain id
 		chainId_, err := client.ChainID(context.Background())
+		if err != nil {
+			log.Errorf("------------client chain id err: %v -----------------", err)
+			continue
+		}
 		if chainId != chainId_.Uint64() {
 			log.Errorf("Chain ID does not match, have: %d, want: %d", chainId_, chainId)
 			return
 		}
 
-		currentBlock, _ := client.BlockNumber(context.Background())
-		vaultx, _ := xdefi.NewVaultX(
+		// #3 filter events
+		currentBlock, err := client.BlockNumber(context.Background())
+		if err != nil {
+			log.Errorf("------------client block number err: %v -----------------", err)
+			continue
+		}
+		vaultx, err := xdefi.NewVaultX(
 			vaultContract,
 			client,
 		)
+		if err != nil {
+			log.Errorf("------------client new vault contract err: %v -----------------", err)
+			continue
+		}
 		// get events from vaultx
 		filterOpts := &bind.FilterOpts{
 			Context: context.Background(),
 			Start:   lastBlock,
-			End:     &currentBlock,
+			End:     nil,
 		}
-		log.Debugf("sentinel: start %d, end: %d", lastBlock, currentBlock)
+		log.Infof("------------------ sentinel: start %d, end: %d---------------------", lastBlock, currentBlock)
 		itr, err := vaultx.FilterTokenDeposit(
 			filterOpts,
 			[]common.Address{},
@@ -179,12 +197,15 @@ func (sentinel *Sentinel) watchDeposit(
 			log.Errorf("Unable to get token deposit iterator: %v", err)
 			continue
 		}
+		eventCount := 0
 		for itr.Next() {
+			eventCount += 1
 			event := itr.Event
 			vaultEvent := core.VaultEvent{
-				event.SourceChainid,
+				vaultContract,
+				big.NewInt(0),
 				event.SourceToken,
-				event.MappedChainid,
+				big.NewInt(0),
 				event.MappedToken,
 				event.From,
 				event.Amount,
@@ -193,11 +214,12 @@ func (sentinel *Sentinel) watchDeposit(
 			}
 
 			// record state in sentinel, include this node itself.
-			sentinel.MarkVaultEvent(vaultContract, &vaultEvent)
-
+			sentinel.MarkVaultEvent(&vaultEvent)
 			// broad cast to other nodes
 			sentinel.vaultEventFeed.Send(vaultEvent)
+			//log.Infof("%s", vaultEvent)
 		}
+		log.Infof("----------------New vault events filtered, [  from: %d, to: latest, count: %d  ] -------------------", lastBlock, eventCount)
 		lastBlock = currentBlock
 	}
 }
@@ -282,16 +304,18 @@ func (sentinel *Sentinel) start() {
 		if sentinel.dkg.IsVSSReady() {
 			break
 		}
+		log.Infof("In sentinel start(): wait for vss ready")
 	}
 	log.Infof("In sentinel start(): vss is ready, t=%d", sentinel.dkg.Bls.Threshold)
 	// create all go routines for watching vault contracts on various blockchains
 	for pairIndex, vaultPairConfig := range sentinel.vaultsConfig.Vaults {
-		pairId := vaultPairConfig.Id()
-		GetLastBlock(sentinel.db, pairId)
-		WriteLastBlock(sentinel.db, pairId, 0)
-
+		//pairId := vaultPairConfig.Id()
+		//GetLastBlock(sentinel.db, pairId)
+		//WriteLastBlock(sentinel.db, pairId, 0)
 		sentinel.VaultEventsChanXY[pairIndex] = make(chan *core.VaultEvent)
-		// watch vaultx
+		sentinel.VaultEventsChanYX[pairIndex] = make(chan *core.VaultEvent)
+
+		// deposit
 		vaultx := vaultPairConfig.VaultX
 		go sentinel.watchDeposit(
 			vaultx.ChainId,
@@ -300,22 +324,27 @@ func (sentinel *Sentinel) start() {
 			common.HexToAddress(vaultx.VaultAddress),
 			sentinel.VaultEventsChanXY[pairIndex],
 		)
-		go sentinel.callMint(
-			sentinel.VaultEventsChanXY[pairIndex],
-		)
 
-		sentinel.VaultEventsChanYX[pairIndex] = make(chan *core.VaultEvent)
-		// watch vaulty
-		vaulty := vaultPairConfig.VaultY
-		go sentinel.watchBurn(
-			vaulty.ChainId,
-			vaulty.ChainFuncPrefix,
-			vaulty.ChainRPC,
-			common.HexToAddress(vaulty.VaultAddress),
-			sentinel.VaultEventsChanYX[pairIndex],
-		)
-		go sentinel.callWithdraw(
-			sentinel.VaultEventsChanYX[pairIndex],
-		)
+		/*
+			// mint
+			go sentinel.callMint(
+				sentinel.VaultEventsChanXY[pairIndex],
+			)
+
+			// burn
+
+			vaulty := vaultPairConfig.VaultY
+			go sentinel.watchBurn(
+				vaulty.ChainId,
+				vaulty.ChainFuncPrefix,
+				vaulty.ChainRPC,
+				common.HexToAddress(vaulty.VaultAddress),
+				sentinel.VaultEventsChanYX[pairIndex],
+			)
+
+			// withdraw
+			go sentinel.callWithdraw(
+				sentinel.VaultEventsChanYX[pairIndex],
+			)*/
 	}
 }
