@@ -627,7 +627,8 @@ func (dkg *DKG) VssUploadConfigLoop() {
 		<-UploadVSSConfigChan
 		// upload secret shares
 		log.Debugf("call UploadVSSConfig from VssStateLoop()")
-		dkg.UploadVSSConfig(false)
+		forceUpdate := false
+		dkg.UploadVSSConfig(forceUpdate)
 	}
 }
 

@@ -52,13 +52,13 @@ func main() {
 	)
 
 	callOpts := &bind.CallOpts{}
-	input, err := xevents.Input(callOpts)
+	input, err := xevents.N(callOpts)
 	log.Printf("input = %d, err: %v", input, err)
 
 	transactOpts, _ := bind.NewKeyedTransactorWithChainID(privateKey, chainID)
-	_, err = xevents.Test(transactOpts, big.NewInt(100))
+	_, err = xevents.Setn(transactOpts, big.NewInt(100))
 	log.Printf("Test(): err: %v", err)
 
-	inputAfter, err := xevents.Input(callOpts)
+	inputAfter, err := xevents.N(callOpts)
 	log.Printf("input after = %d, err: %v ", inputAfter, err)
 }

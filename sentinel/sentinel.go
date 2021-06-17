@@ -83,6 +83,7 @@ func New(bc *core.BlockChain, vaultsConfig *VaultPairListConfig, db mcdb.Databas
 	sentinel.scope.Open()
 	sentinel.chainHeadSub = bc.SubscribeChainHeadEvent(sentinel.chainHeadCh)
 	log.Infof("sentinel start with config: %v", sentinel.vaultsConfig)
+	go sentinel.watchNewBlock()
 	//go sentinel.start()
 
 	return sentinel
@@ -260,6 +261,18 @@ func (sentinel *Sentinel) threshold() int {
 		return sentinel.dkg.Bls.Threshold
 	} else {
 		return 0
+	}
+}
+
+func (sentinel *Sentinel) watchNewBlock() {
+	for {
+		select {
+		case event := <-sentinel.chainHeadCh:
+			log.Infof(
+				"[-----------sentinel watch chain head: %d, vss ready: %t -------------]",
+				event.Block.Number(), sentinel.dkg.IsVSSReady(),
+			)
+		}
 	}
 }
 

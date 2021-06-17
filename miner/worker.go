@@ -318,7 +318,7 @@ func (self *worker) wait() {
 			if stat == core.CanonStatTy {
 				events = append(events, core.ChainHeadEvent{Block: block})
 			}
-			//self.chain.PostChainEvents(events, logs)
+			self.chain.PostChainEvents(events, logs)
 
 			// Insert the block into the set of pending ones to wait for confirmations
 			self.unconfirmed.Insert(block.NumberU64(), block.Hash())

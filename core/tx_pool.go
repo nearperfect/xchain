@@ -21,24 +21,20 @@ import (
 	"fmt"
 	"math"
 	"math/big"
-	"runtime"
 	"sort"
 	"sync"
 	"time"
+
+	"gopkg.in/fatih/set.v0"
+	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 
 	"github.com/MOACChain/MoacLib/common"
 	"github.com/MOACChain/MoacLib/log"
 	"github.com/MOACChain/MoacLib/metrics"
 	"github.com/MOACChain/MoacLib/params"
-	pb "github.com/MOACChain/MoacLib/proto"
-	"github.com/MOACChain/MoacLib/rlp"
 	"github.com/MOACChain/MoacLib/state"
 	"github.com/MOACChain/MoacLib/types"
 	"github.com/MOACChain/xchain/event"
-	"github.com/MOACChain/xchain/networkrelay"
-	"github.com/MOACChain/xchain/node"
-	"gopkg.in/fatih/set.v0"
-	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 )
 
 const (
@@ -584,28 +580,10 @@ func (pool *TxPool) PendingByRole() (map[common.Address]types.Transactions, map[
 
 	pendingH := make(map[common.Address]types.Transactions)
 	pendingL := make(map[common.Address]types.Transactions)
-	nr := networkrelay.GetInstance()
-	if nr == nil {
-		for addr, list := range pool.pending {
-			pendingL[addr] = list.Flatten()
-		}
-		return pendingH, pendingL
-	}
 
 	for addr, list := range pool.pending {
-		txs := list.Flatten()
-		l := len(txs)
-		for i := 0; i < l; i++ {
-			to := txs[i].To()
-			data := txs[i].Data()
-			if to != nil && len(data) >= 4 && nr.Priority(*to, addr, data[:4]) {
-				pendingH[addr] = append(pendingH[addr], txs[i])
-			} else {
-				pendingL[addr] = append(pendingL[addr], txs[i])
-			}
-		}
+		pendingL[addr] = list.Flatten()
 	}
-
 	return pendingH, pendingL
 }
 
@@ -668,15 +646,7 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	// Drop non-local transactions under our own minimal accepted gas price
 	local = local || pool.locals.contains(from) // account may be local even if the transaction arrived from the network
 	if !local {
-		nr := networkrelay.GetInstance()
-		to := tx.To()
-		data := tx.Data()
-		if nr != nil && to != nil && len(data) >= 4 && nr.Priority(*to, from, data[:4]) {
-			if minSpecGasPrice > tx.GasPrice().Uint64() {
-				log.Debugf("Spec gas price %v %v", pool.gasPrice, tx.GasPrice())
-				return ErrUnderpriced
-			}
-		} else if pool.gasPrice.Cmp(tx.GasPrice()) > 0 {
+		if pool.gasPrice.Cmp(tx.GasPrice()) > 0 {
 			log.Debugf("Gas price %v %v", pool.gasPrice, tx.GasPrice())
 			return ErrUnderpriced
 		}
@@ -843,81 +813,6 @@ func (pool *TxPool) MarkDirectTx(hash common.Hash) {
 	pool.KnownDirectTxs.Add(hash)
 }
 
-func (pool *TxPool) sendDirectCall(tx *types.Transaction) error {
-	txHash := tx.Hash()
-	if pool.KnownDirectTxs.Has(txHash) {
-		return errors.New("Marked transactions")
-	}
-	pool.MarkDirectTx(txHash)
-
-	nr := networkrelay.GetInstance()
-	if nr == nil {
-		time.Sleep(time.Duration(10))
-		nr = networkrelay.GetInstance()
-		if nr == nil {
-			log.Errorf("failed to get the network relay instance")
-			return errors.New("failed to get the network relay instance")
-		}
-	}
-	receiver, _ := rlp.EncodeToBytes(tx.TxData.Recipient)
-	sender, _ := rlp.EncodeToBytes(common.HexToAddress(tx.GetSender()))
-	txType := common.IntToBytes(params.DirectCall)
-	subChainId, _ := rlp.EncodeToBytes(tx.TxData.Recipient)
-	status, _ := rlp.EncodeToBytes(0)
-	msghash, _ := rlp.EncodeToBytes(tx)
-
-	nodeObj := node.GetInstance()
-	var requestId []byte
-	if nodeObj != nil {
-		requestId, _ = nodeObj.GetRequestId(true)
-	} else {
-		requestId = []byte("")
-	}
-	req := &pb.ScsPushMsg{
-		Requestid:   requestId,
-		Timestamp:   common.Int64ToBytes(time.Now().Unix()),
-		Requestflag: true,
-		Sender:      sender,
-		Receiver:    receiver,
-		Type:        txType,
-		Subchainid:  subChainId,
-		Status:      status,
-		Scsid:       []byte(""),
-		Msghash:     msghash,
-	}
-	result, err := nr.VnodePushMsg(req)
-	if err != nil {
-		log.Errorf("sendDirectCall  error %v", err)
-	} else {
-		tx.DirCallSent = true
-	}
-	log.Debugf("sendDirectCall result: %v", result)
-	pool.shardingTxFeed.Send(ShardingTxEvent{tx})
-	return nil
-}
-
-/*
- *
- */
-func (pool *TxPool) manageDirectCall(addr common.Address, tx *types.Transaction) error {
-	pool.muDC.Lock()
-	defer pool.muDC.Unlock()
-	//Check limit per block
-	if pool.directCalls[addr] == nil {
-		pool.directCalls[addr] = newTxList(true)
-	}
-	directCallList := pool.directCalls[addr]
-	tx.DirCallSent = false
-
-	//Should check the valid Via address,
-	//If the directCall via address is not
-	//equal to the vnode coinbase/Vnode
-	directCallList.Add(tx, 0)
-	nano := time.Now().Nanosecond()
-	log.Debugf("sendDirectCall #goroutines: %v directCallList size %v time %v txHash %v", runtime.NumGoroutine(), directCallList.Len(), nano, tx.Hash().Hex())
-	return pool.sendDirectCall(tx)
-}
-
 // promoteTx adds a transaction to the pending (processable) list of transactions.
 // Note, this method assumes the pool lock is held!
 func (pool *TxPool) promoteTx(addr common.Address, hash common.Hash, tx *types.Transaction) {
@@ -994,10 +889,6 @@ func (pool *TxPool) addTx(tx *types.Transaction, local bool) error {
 		return ErrInvalidSender
 	}
 
-	if tx.ShardingFlag() != 0 {
-		return pool.manageDirectCall(from, tx)
-	}
-
 	// Try to inject the transaction and update any state
 	replace, err := pool.add(tx, local)
 	if err != nil {
@@ -1020,10 +911,6 @@ func (pool *TxPool) addTxsLocked(txs []*types.Transaction, local bool) error {
 	dirty := make(map[common.Address]struct{})
 	for _, tx := range txs {
 		from, _ := types.Sender(pool.signer, tx) // already validated
-		if tx.ShardingFlag() != 0 {
-			pool.manageDirectCall(from, tx)
-			continue
-		}
 		if replace, err := pool.add(tx, local); err == nil {
 			if !replace {
 				log.Debugf("validate sender from %x", from)
