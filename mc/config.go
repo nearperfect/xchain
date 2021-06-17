@@ -27,9 +27,12 @@ import (
 	"github.com/MOACChain/MoacLib/common/hexutil"
 	"github.com/MOACChain/MoacLib/mcdb"
 	"github.com/MOACChain/MoacLib/params"
+	"github.com/MOACChain/xchain/accounts/keystore"
 	"github.com/MOACChain/xchain/core"
 	"github.com/MOACChain/xchain/mc/downloader"
 	"github.com/MOACChain/xchain/mc/gasprice"
+	"github.com/MOACChain/xchain/sentinel"
+	vnodeconfig "github.com/MOACChain/xchain/vnode/config"
 )
 
 const SubnetsConfigPrefix = "subnetsConfig"
@@ -53,6 +56,8 @@ var DefaultConfig = Config{
 		Blocks:     10,
 		Percentile: 50,
 	},
+	VnodeConfigPath:  "./vnodeconfig.json",
+	VaultsConfigPath: "./vaults.json",
 }
 
 func init() {
@@ -117,6 +122,18 @@ type Config struct {
 	PowFake   bool   `toml:"-"`
 	PowTest   bool   `toml:"-"`
 	PowShared bool   `toml:"-"`
+
+	// vss
+	XchainId  common.Address
+	XchainKey *keystore.Key
+
+	// Vnode config
+	VnodeConfigPath string
+	VnodeConfig     *vnodeconfig.Configuration
+
+	// vaults
+	VaultsConfigPath string
+	VaultsConfig     *sentinel.VaultPairListConfig
 }
 
 type configMarshaling struct {

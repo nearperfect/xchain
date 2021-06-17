@@ -5,10 +5,12 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"log"
+	"math/big"
 
 	"github.com/MOACChain/MoacLib/common"
 	"github.com/MOACChain/MoacLib/crypto"
 	"github.com/MOACChain/xchain/accounts/abi/bind"
+	"github.com/MOACChain/xchain/core"
 	"github.com/MOACChain/xchain/mcclient"
 	"github.com/MOACChain/xchain/mcclient/xdefi"
 )
@@ -77,12 +79,17 @@ func main() {
 
 	transactOpts, _ := bind.NewKeyedTransactorWithChainID(privateKey, chainID)
 	for _, validator := range allValidators {
-		tx, err := vaultx.AddValidator(transactOpts, common.HexToAddress(validator))
-		log.Printf("%s, %v", tx, err)
+		//tx, err := vaultx.AddValidator(transactOpts, common.HexToAddress(validator))
+		//log.Printf("%s, %v", tx, err)
+		vaultx.AddValidator(transactOpts, common.HexToAddress(validator))
 	}
 
 	// get events
-	filterOpts := &bind.FilterOpts{Context: context.Background(), Start: 1, End: nil}
+	filterOpts := &bind.FilterOpts{
+		Context: context.Background(),
+		Start:   1,
+		End:     nil,
+	}
 	itr, err := vaultx.FilterRoleGranted(
 		filterOpts,
 		[][32]byte{},
@@ -92,5 +99,40 @@ func main() {
 	for itr.Next() {
 		event := itr.Event
 		log.Printf("%x, %x, %x\n", event.Role, event.Account.Bytes(), event.Sender.Bytes())
+	}
+
+	// get events from vaultx
+	filterOpts2 := &bind.FilterOpts{
+		Context: context.Background(),
+		Start:   1,
+		End:     nil,
+	}
+	itr2, err := vaultx.FilterTokenDeposit(
+		filterOpts2,
+		[]common.Address{},
+		[]common.Address{},
+		[]*big.Int{},
+	)
+	for itr2.Next() {
+		event := itr2.Event
+		log.Printf("vault event 1 %x, %x, %x, %s, %d",
+			event.SourceToken.Bytes(),
+			event.MappedToken.Bytes(),
+			event.From.Bytes(),
+			event.Amount,
+			event.DepositNonce.Uint64(),
+		)
+
+		vaultEvent := core.VaultEvent{
+			event.SourceChainid,
+			event.SourceToken,
+			event.MappedChainid,
+			event.MappedToken,
+			event.From,
+			event.Amount,
+			event.DepositNonce,
+			[]byte{},
+		}
+		log.Printf("vault event 2 %v", vaultEvent)
 	}
 }

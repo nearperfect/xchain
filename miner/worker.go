@@ -101,7 +101,6 @@ type worker struct {
 	agents         map[Agent]struct{}
 	recv           chan *Result
 	mc             Backend
-	nr             NetworkRelay
 	chain          *core.BlockChain
 	proc           core.Validator
 	chainDb        mcdb.Database
@@ -116,12 +115,11 @@ type worker struct {
 	atWork         int32
 }
 
-func newWorker(config *params.ChainConfig, engine consensus.Engine, coinbase common.Address, mc Backend, mux *event.TypeMux, nr NetworkRelay) *worker {
+func newWorker(config *params.ChainConfig, engine consensus.Engine, coinbase common.Address, mc Backend, mux *event.TypeMux) *worker {
 	worker := &worker{
 		config:         config,
 		engine:         engine,
 		mc:             mc,
-		nr:             nr,
 		mux:            mux,
 		txCh:           make(chan core.TxPreEvent, txChanSize),
 		chainHeadCh:    make(chan core.ChainHeadEvent, chainHeadChanSize),
@@ -257,7 +255,13 @@ func (self *worker) update() {
 				txs := map[common.Address]types.Transactions{acc: {ev.Tx}}
 				txset := types.NewTransactionsByPriceAndNonce(self.current.signer, txs)
 
-				self.current.commitTransactions(self.mux, []*types.TransactionsByPriceAndNonce{txset}, self.chain, self.coinbase, self.mc, nil)
+				self.current.commitTransactions(
+					self.mux,
+					[]*types.TransactionsByPriceAndNonce{txset},
+					self.chain,
+					self.coinbase,
+					self.mc,
+				)
 				self.currentMu.Unlock()
 			}
 
@@ -314,7 +318,7 @@ func (self *worker) wait() {
 			if stat == core.CanonStatTy {
 				events = append(events, core.ChainHeadEvent{Block: block})
 			}
-			self.chain.PostChainEvents(events, logs)
+			//self.chain.PostChainEvents(events, logs)
 
 			// Insert the block into the set of pending ones to wait for confirmations
 			self.unconfirmed.Insert(block.NumberU64(), block.Hash())
@@ -433,9 +437,9 @@ func (self *worker) commitNewWork() {
 	txs := []*types.TransactionsByPriceAndNonce{txsH, txsL}
 
 	if atomic.LoadInt32(&self.mining) == 0 {
-		work.commitTransactions(self.mux, txs, self.chain, self.coinbase, self.mc, nil)
+		work.commitTransactions(self.mux, txs, self.chain, self.coinbase, self.mc)
 	} else {
-		work.commitTransactions(self.mux, txs, self.chain, self.coinbase, self.mc, self.nr)
+		work.commitTransactions(self.mux, txs, self.chain, self.coinbase, self.mc)
 	}
 	// compute uncles for the new block.
 	var (
@@ -493,7 +497,7 @@ func (self *worker) commitUncle(work *Work, uncle *types.Header) error {
 	return nil
 }
 
-func (env *Work) commitTransactions(mux *event.TypeMux, txs []*types.TransactionsByPriceAndNonce, bc *core.BlockChain, coinbase common.Address, mc Backend, nr NetworkRelay) {
+func (env *Work) commitTransactions(mux *event.TypeMux, txs []*types.TransactionsByPriceAndNonce, bc *core.BlockChain, coinbase common.Address, mc Backend) {
 	gp := new(core.GasPool).AddGas(env.header.GasLimit)
 	var coalescedLogs []*types.Log
 	var queryQueue []*types.QueryContract
@@ -501,7 +505,7 @@ func (env *Work) commitTransactions(mux *event.TypeMux, txs []*types.Transaction
 	{
 		systx := core.CreateSysTx(env.state)
 
-		err, receipt := env.commitTransaction(systx, bc, coinbase, gp, mc, nr)
+		err, receipt := env.commitTransaction(systx, bc, coinbase, gp, mc)
 		if err == nil {
 			// Everything ok, collect the logs and shift in the next transaction from the same account
 			coalescedLogs = append(coalescedLogs, receipt.Logs...)
@@ -533,7 +537,7 @@ func (env *Work) commitTransactions(mux *event.TypeMux, txs []*types.Transaction
 			// Start executing the transaction
 			env.state.Prepare(tx.Hash(), common.Hash{}, env.tcount)
 
-			err, receipt := env.commitTransaction(tx, bc, coinbase, gp, mc, nr)
+			err, receipt := env.commitTransaction(tx, bc, coinbase, gp, mc)
 			switch err {
 			case core.ErrGasLimitReached:
 				// Pop the current out-of-gas transaction without shifting in the next from the account
@@ -600,11 +604,11 @@ func (env *Work) commitTransactions(mux *event.TypeMux, txs []*types.Transaction
 	}
 }
 
-func (env *Work) commitTransaction(tx *types.Transaction, bc *core.BlockChain, coinbase common.Address, gp *core.GasPool, mc Backend, nr NetworkRelay) (error, *types.Receipt) {
+func (env *Work) commitTransaction(tx *types.Transaction, bc *core.BlockChain, coinbase common.Address, gp *core.GasPool, mc Backend) (error, *types.Receipt) {
 	snap := env.state.Snapshot()
 
 	//here NetworkRelay becomes NetworkRelayInterface item.
-	receipt, _, err := core.ApplyTransaction(env.config, bc, &coinbase, gp, env.state, env.header, tx, env.header.GasUsed, vm.Config{}, mc.TxPool(), nr)
+	receipt, _, err := core.ApplyTransaction(env.config, bc, &coinbase, gp, env.state, env.header, tx, env.header.GasUsed, vm.Config{}, mc.TxPool())
 	if err != nil {
 		env.state.RevertToSnapshot(snap)
 		return err, nil

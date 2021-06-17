@@ -25,7 +25,6 @@ import (
 	"github.com/MOACChain/xchain/console"
 	"github.com/MOACChain/xchain/node"
 	"github.com/MOACChain/xchain/rpc"
-	"github.com/MOACChain/xchain/vnode"
 	"gopkg.in/urfave/cli.v1"
 )
 
@@ -76,11 +75,6 @@ JavaScript API. See https://github.com/MOACChain/xchain/wiki/Javascipt-Console`,
 // localConsole starts a new MOAC node, attaching a JavaScript console to it at the
 // same time.
 func localConsole(ctx *cli.Context) error {
-	configFilePath := ctx.GlobalString(utils.VnodeConfig.Name)
-
-	//Start vnode SCS service
-	go vnode.VnodeServiceStart(configFilePath)
-
 	// Create and start the node based on the CLI flags
 	node := makeFullNode(ctx)
 	startNode(ctx, node)
