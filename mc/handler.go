@@ -109,28 +109,28 @@ type SubnetConfig struct {
 }
 
 type ProtocolManager struct {
-	networkId       uint64
-	fastSync        uint32 // Flag whether fast sync is enabled (gets disabled if we already have blocks)
-	acceptTxs       uint32 // Flag whether we're considered synchronised (enables transaction processing)
-	txpool          txPool
-	sentinel        *sentinel.Sentinel
-	dkg             *dkg.DKG
-	blockchain      *core.BlockChain
-	chaindb         mcdb.Database
-	chainconfig     *params.ChainConfig
-	subnetsConfigdb mcdb.Database
-	subnetsConfig   map[string]SubnetConfig
-	downloader      *downloader.Downloader
-	fetcher         *fetcher.Fetcher
-	SubProtocols    []p2p.Protocol
-	eventMux        *event.TypeMux
-	txCh            chan core.TxPreEvent // chan for mainnet transactions
-	txSub           event.Subscription
-	vaultEventCh    chan core.VaultEvent // chan for vault events
-	vaultEventSub   event.Subscription
-	shardingTxCh    chan core.ShardingTxEvent // chan for sharding chan transactions
-	shardingTxSub   event.Subscription
-	minedBlockSub   *event.TypeMuxSubscription
+	networkId            uint64
+	fastSync             uint32 // Flag whether fast sync is enabled (gets disabled if we already have blocks)
+	acceptTxs            uint32 // Flag whether we're considered synchronised (enables transaction processing)
+	txpool               txPool
+	sentinel             *sentinel.Sentinel
+	dkg                  *dkg.DKG
+	blockchain           *core.BlockChain
+	chaindb              mcdb.Database
+	chainconfig          *params.ChainConfig
+	subnetsConfigdb      mcdb.Database
+	subnetsConfig        map[string]SubnetConfig
+	downloader           *downloader.Downloader
+	fetcher              *fetcher.Fetcher
+	SubProtocols         []p2p.Protocol
+	eventMux             *event.TypeMux
+	txCh                 chan core.TxPreEvent // chan for mainnet transactions
+	txSub                event.Subscription
+	vaultEventWithSigCh  chan core.VaultEventWithSig // chan for vault events
+	vaultEventWithSigSub event.Subscription
+	shardingTxCh         chan core.ShardingTxEvent // chan for sharding chan transactions
+	shardingTxSub        event.Subscription
+	minedBlockSub        *event.TypeMuxSubscription
 
 	// channels for fetcher, syncer, txsyncLoop
 	newPeerCh   chan *Peer
@@ -345,8 +345,8 @@ func (pm *ProtocolManager) Start(maxPeers int) {
 	pm.shardingTxSub = pm.txpool.SubscribeShardingTxEvent(pm.shardingTxCh)
 
 	// broadcast vault events
-	pm.vaultEventCh = make(chan core.VaultEvent, vaultEventChanSize)
-	pm.vaultEventSub = pm.sentinel.SubscribeVaultEvent(pm.vaultEventCh)
+	pm.vaultEventWithSigCh = make(chan core.VaultEventWithSig, vaultEventChanSize)
+	pm.vaultEventWithSigSub = pm.sentinel.SubscribeVaultEventWithSig(pm.vaultEventWithSigCh)
 
 	// broadcast tx
 	go pm.txBroadcastLoop()
@@ -1181,17 +1181,18 @@ func (pm *ProtocolManager) handleMainnetMsg(p *Peer, msg p2p.Msg) error {
 
 	case msg.Code == VaultEventMsg:
 		log.Infof("  vault event received !!!!!!!!!!!!!!")
-		var vaultEvents []*core.VaultEvent
+		var vaultEventWithSigs []*core.VaultEventWithSig
 		// Parse all vault events
-		if err := msg.Decode(&vaultEvents); err != nil {
+		if err := msg.Decode(&vaultEventWithSigs); err != nil {
 			return ErrResp(ErrDecode, "vault events msg parse error: %v: %v", msg, err)
 		}
-		for _, event := range vaultEvents {
-			pm.sentinel.MarkVaultEvent(event)
-		}
 
-		for _, event := range vaultEvents {
-			p.MarkVaultEvent(event.Hash())
+		for _, vaultEventWithSig := range vaultEventWithSigs {
+			p.MarkVaultEventWithSigs(vaultEventWithSig.Hash())
+			batchNumber := uint64(0)
+			pm.sentinel.ProcessVaultEventWithSig(vaultEventWithSig, batchNumber)
+			// sent to peers who don't have the event
+			pm.vaultEventWithSigCh <- *vaultEventWithSig
 		}
 
 	case msg.Code == ScsMsg:
@@ -1293,15 +1294,15 @@ func (pm *ProtocolManager) BroadcastTx(tx *types.Transaction) {
 	}
 }
 
-func (pm *ProtocolManager) BroadcastVaultEvent(vaultEvent *core.VaultEvent) {
-	log.Debugf("Vault event: %s", vaultEvent)
+func (pm *ProtocolManager) BroadcastVaultEventWithSig(vaultEventWithSig *core.VaultEventWithSig) {
+	log.Debugf("Vault event: %s", vaultEventWithSig)
 	peerSet := pm.p2pManager.peerSet
 	if peerSet == nil {
 		return
 	}
-	peers := peerSet.PeersWithoutVaultEvent(vaultEvent.Hash())
+	peers := peerSet.PeersWithoutVaultEventWithSig(vaultEventWithSig.Hash())
 	for _, peer := range peers {
-		peer.AsyncSendVaultEvents(core.VaultEvents{vaultEvent})
+		peer.AsyncSendVaultEventWithSigs(core.VaultEventWithSigs{vaultEventWithSig})
 	}
 }
 
@@ -1348,13 +1349,18 @@ func (pm *ProtocolManager) txBroadcastLoop() {
 }
 
 func (pm *ProtocolManager) vaultEventBroadcastLoop() {
+	defer log.Infof("Loop exit: vaultEventBroadcastLoop")
+	eventCount := 0
 	for {
 		select {
-		case event := <-pm.vaultEventCh:
-			pm.BroadcastVaultEvent(&event)
-			return
-		case <-pm.vaultEventSub.Err():
-			return
+		case event := <-pm.vaultEventWithSigCh:
+			log.Infof(
+				"@@@@@@@@@@@@@@@@@@@@@!!!!!!!!!!!!!!!! broadcast vault event channel [seen=%d]: %x",
+				eventCount, event.Hash().Bytes()[:8],
+			)
+			pm.BroadcastVaultEventWithSig(&event)
+			eventCount += 1
+		case <-pm.vaultEventWithSigSub.Err():
 		}
 	}
 }

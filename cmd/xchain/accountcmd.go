@@ -95,6 +95,17 @@ between MOAC nodes by simply copying.
 Make sure you backup your keys regularly.`,
 		Subcommands: []cli.Command{
 			{
+				Name:   "listx",
+				Usage:  "Print summary of existing accounts for xchain",
+				Action: utils.MigrateFlags(accountListX),
+				Flags: []cli.Flag{
+					utils.DataDirFlag,
+					utils.KeyStoreDirFlag,
+				},
+				Description: `
+Print a short summary of all accounts`,
+			},
+			{
 				Name:   "list",
 				Usage:  "Print summary of existing accounts",
 				Action: utils.MigrateFlags(accountList),
@@ -128,6 +139,18 @@ For non-interactive use the passphrase can be specified with the --password flag
 Note, this is meant to be used for testing only, it is a bad idea to save your
 password to file or expose in any other way.
 `,
+			},
+			{
+				Name:   "newx",
+				Usage:  "Create a new xchain account",
+				Action: utils.MigrateFlags(accountCreateX),
+				Flags: []cli.Flag{
+					utils.DataDirFlag,
+					utils.KeyStoreDirFlag,
+					utils.PasswordFileFlag,
+					utils.XchainPasswordFlag,
+				},
+				Description: `Create a new xchain account`,
 			},
 			{
 				Name:      "update",

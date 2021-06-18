@@ -43,9 +43,9 @@ import (
 	"github.com/MOACChain/xchain/accounts/abi/bind"
 	"github.com/MOACChain/xchain/accounts/keystore"
 	"github.com/MOACChain/xchain/mcclient"
-	"github.com/MOACChain/xchain/mcclient/xdefi"
 	"github.com/MOACChain/xchain/params"
 	"github.com/MOACChain/xchain/vnode/config"
+	"github.com/MOACChain/xchain/xdefi/vssbase"
 )
 
 type RevealedShare struct {
@@ -109,7 +109,7 @@ type DKG struct {
 	client       *mcclient.Client
 	callOpts     *bind.CallOpts
 	transactOpts *bind.TransactOpts
-	vssbase      *xdefi.VssBase
+	vssbase      *vssbase.VssBase
 	vnodeconfig  *config.Configuration
 }
 
@@ -119,17 +119,36 @@ func New(cfg *config.Configuration, vssid common.Address, key *keystore.Key) *DK
 	client, err := mcclient.Dial(url)
 	if err != nil {
 		log.Errorf("Can not get vnode client with config: %s", url)
+		panic("dkg init failed")
 	} else {
 		log.Infof("Get vnode client with config: %s", url)
 	}
-	vssbase, _ := xdefi.NewVssBase(
+	chainId_, err := client.ChainID(context.Background())
+	if err != nil {
+		log.Errorf("------------client chain id err: %v -----------------", err)
+		panic("dkg init failed")
+	}
+	if uint64(cfg.ChainId) != chainId_.Uint64() {
+		log.Errorf("Chain ID does not match, have: %d, want: %d, check vnodeconfig.json and restart", chainId_, uint64(cfg.ChainId))
+		panic("dkg init failed")
+	}
+	vssbase, err := vssbase.NewVssBase(
 		common.HexToAddress(cfg.VssBaseAddr),
 		client,
 	)
-	transactor, _ := bind.NewKeyedTransactorWithChainID(
+	if err != nil {
+		log.Errorf("Can not init vssbase instance, err: %v", err)
+		panic("dkg init failed")
+	}
+
+	transactor, err := bind.NewKeyedTransactorWithChainID(
 		key.PrivateKey,
 		big.NewInt(int64(cfg.ChainId)),
 	)
+	if err != nil {
+		log.Errorf("Can not init transactor, err: %v", err)
+		panic("dkg init failed")
+	}
 	vss := &VSS{
 		VSSNodeChan:  make(chan *VSSNode, 10),
 		SigShareChan: make(chan *SigShareMessage, 10),
@@ -256,7 +275,10 @@ func (dkg *DKG) GetVssNodeCount() uint64 {
 }
 
 func (dkg *DKG) GetVssConfigVersion() uint64 {
-	n, _ := dkg.vssbase.VssConfigVersion(dkg.callOpts)
+	n, err := dkg.vssbase.VssConfigVersion(dkg.callOpts)
+	if err != nil {
+		log.Errorf("In GetVssConfigVersion, err: ", err)
+	}
 	return n.Uint64()
 }
 
@@ -549,7 +571,6 @@ func GetOrCreateVSSKey(vssBaseAddr common.Address) *VSSKey {
 	vsskey := &VSSKey{}
 	if len(vsskeyBytes) == 0 {
 		vsskey = GenerateVSSKey()
-
 		// store the vss key in db
 		pVSSKey := ToPersistVSSKey(vsskey)
 		data, _ := json.Marshal(pVSSKey)
@@ -611,7 +632,7 @@ func (dkg *DKG) NewVnodeBlockLoop() {
 // runs indefinitely and update vss config and update vss config if needed
 func (dkg *DKG) VssStateLoop() {
 	log.Debugf("vss state loop, runs on new block")
-	defer log.Debugf("vss state loop exits")
+	defer log.Errorf("vss state loop exits")
 	for {
 		<-VssStateChan
 		// download secret shares
@@ -622,7 +643,7 @@ func (dkg *DKG) VssStateLoop() {
 // runs indefinitely and upload vss config if needed.
 func (dkg *DKG) VssUploadConfigLoop() {
 	log.Debugf("vss upload config loop, runs on new block")
-	defer log.Debugf("vss upload config loop exit")
+	defer log.Errorf("vss upload config loop exit")
 	for {
 		<-UploadVSSConfigChan
 		// upload secret shares
@@ -639,7 +660,7 @@ func (dkg *DKG) VssSlashingLoop() {
 	// mapping: slash index -> bool
 	slashed := make(map[uint64]bool)
 	log.Debugf("vss slashing loop, runs on new block")
-	defer log.Debugf("vss slashing loop exit")
+	defer log.Errorf("vss slashing loop exit")
 
 	for {
 		select {
@@ -723,7 +744,7 @@ func (dkg *DKG) VssSlashingLoop() {
 	}
 }
 
-func (dkg *DKG) verifyRevealedShare(revealedShare xdefi.VssBaseRevealedShare) (
+func (dkg *DKG) verifyRevealedShare(revealedShare vssbase.VssBaseRevealedShare) (
 	common.Address, int, error) {
 	var priShares []PersistPrivateShare
 	var pubShares []PersistPublicShare
@@ -790,6 +811,7 @@ func (dkg *DKG) RunVssStateMachine() {
 	// converge to the same state given that config version change is rare (add new node
 	// or delete old node).
 	vssConfigVersion := dkg.GetVssConfigVersion()
+	log.Infof("vss config version %d", vssConfigVersion)
 	if seen := dkg.vssSeenConfigs[int(vssConfigVersion)]; !seen {
 		// if not found, the it is a new state
 		// we should call updateVssConfig() to get the latest vss setting
@@ -893,6 +915,8 @@ func (dkg *DKG) UpdateVSSConfig() int {
 	if err != nil {
 		log.Errorf("vss updateVssConfig() failed with %v", err)
 		return VssConfigRecheck
+	} else {
+		log.Errorf("pubshares [%d]", pubshares)
 	}
 	pubShareCount := 1
 	for addr, publicShares := range pubshares {
@@ -905,7 +929,7 @@ func (dkg *DKG) UpdateVSSConfig() int {
 			allPublicShares = append(allPublicShares, shares)
 			verifyPublicShares[addr] = shares
 			signedPublicShares[addr] = signedShares
-			log.Debugf(
+			log.Infof(
 				"Decoded (%d/%d) public shares: %v",
 				pubShareCount,
 				len(pubshares),
@@ -914,6 +938,7 @@ func (dkg *DKG) UpdateVSSConfig() int {
 		}
 		pubShareCount++
 	}
+	log.Errorf("pubShareCount %d", pubShareCount)
 
 	// get all private shares, including non-active ones
 	allPrivateShares := make([]*[]*share.PriShare, 0)
@@ -971,7 +996,7 @@ func (dkg *DKG) UpdateVSSConfig() int {
 		}
 		priShareCount++
 	}
-
+	log.Errorf("priShareCount %d", priShareCount)
 	// create a new curve suite
 	suite := bn256.NewSuite()
 
@@ -1481,6 +1506,7 @@ func (dkg *DKG) verifyShares(
 	// verify received pub and pri shares
 	notVerify := make(map[common.Address]*share.PriShare)
 	for sender, pubshares := range verifyPublicShares {
+		log.Errorf("sender: %x, pubshares %v", sender, pubshares)
 		for _, pubshare := range *pubshares {
 			// locate the pubshare for this node
 			if pubshare.I == sciBls.NodeIndex {

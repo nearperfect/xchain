@@ -550,6 +550,10 @@ func (n *Node) startHTTP(endpoint string, apis []rpc.API, modules []string, cors
 	return nil
 }
 
+func (n *Node) RpcEndPoint() string {
+	return fmt.Sprintf("%s", n.httpEndpoint)
+}
+
 // stopHTTP terminates the HTTP RPC endpoint.
 func (n *Node) stopHTTP() {
 	if n.httpListener != nil {

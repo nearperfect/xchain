@@ -58,6 +58,7 @@ var DefaultConfig = Config{
 	},
 	VnodeConfigPath:  "./vnodeconfig.json",
 	VaultsConfigPath: "./vaults.json",
+	LocalRpc:         "http://0.0.0.0:8545",
 }
 
 func init() {
@@ -134,6 +135,9 @@ type Config struct {
 	// vaults
 	VaultsConfigPath string
 	VaultsConfig     *sentinel.VaultPairListConfig
+
+	// xevents
+	LocalRpc string
 }
 
 type configMarshaling struct {

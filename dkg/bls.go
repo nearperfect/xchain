@@ -17,6 +17,7 @@ package dkg
 
 import (
 	"github.com/MOACChain/MoacLib/common"
+	"github.com/MOACChain/MoacLib/log"
 	blslib "github.com/innowells/bls_lib/v2"
 	kyber "go.dedis.ch/kyber/v3"
 	share "go.dedis.ch/kyber/v3/share"
@@ -105,6 +106,7 @@ func MarshalPublicShares(pubshares []*share.PubShare, key kyber.Scalar) []byte {
 
 func UnmarshalPublicShares(input *[]byte, pubkey kyber.Point) (*[]*share.PubShare, PersistPublicShares) {
 	r, v := blslib.UnmarshalPublicShares(input, pubkey)
+	log.Errorf("r: %v", r)
 	return r, PersistPublicShares(v)
 }
 

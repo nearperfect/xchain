@@ -39,8 +39,8 @@ import (
 	"github.com/MOACChain/MoacLib/common"
 	"github.com/MOACChain/MoacLib/log"
 	"github.com/MOACChain/xchain/accounts/keystore"
-	"github.com/MOACChain/xchain/mcclient/xdefi"
 	"github.com/MOACChain/xchain/params"
+	"github.com/MOACChain/xchain/xdefi/vssbase"
 )
 
 type RevealedShare struct {
@@ -627,7 +627,7 @@ func (pos *Pos) VssSlashingLoop() {
 	}
 }
 
-func (pos *Pos) verifyRevealedShare(revealedShare xdefi.VssBaseRevealedShare) (
+func (pos *Pos) verifyRevealedShare(revealedShare vssbase.VssBaseRevealedShare) (
 	common.Address, int, error) {
 	var priShares []PersistPrivateShare
 	var pubShares []PersistPublicShare

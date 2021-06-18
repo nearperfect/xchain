@@ -18,6 +18,7 @@ package sentinel
 
 import (
 	"github.com/MOACChain/MoacLib/mcdb"
+	"github.com/MOACChain/MoacLib/rlp"
 )
 
 var (
@@ -35,10 +36,20 @@ func LastBlockKey(pair string) []byte {
 
 func GetLastBlock(db DatabaseReader, pair string) uint64 {
 	key := LastBlockKey(pair)
-	_, _ = db.Get(key)
-	return 0
+	data, _ := db.Get(key)
+	if len(data) == 0 {
+		return 0
+	}
+	var ret uint64
+	rlp.DecodeBytes(data, &ret)
+	return ret
 }
 
-func WriteLastBlock(db mcdb.Putter, pair string, value uint64) error {
-	return nil
+func WriteLastBlock(db mcdb.Putter, pair *string, value *uint64) error {
+	enc, err := rlp.EncodeToBytes(*value)
+	if err != nil {
+		panic(0)
+	}
+	key := LastBlockKey(*pair)
+	return db.Put(key, enc)
 }

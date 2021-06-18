@@ -175,7 +175,10 @@ func New(ctx *node.ServiceContext, config *Config) (*MoacService, error) {
 	log.Infof("DKG ********** %v", mcSrv.dkg)
 
 	// sentinel for vault
-	mcSrv.sentinel = sentinel.New(mcSrv.BlockChain(), mcSrv.config.VaultsConfig, chainDb, mcSrv.dkg)
+	mcSrv.sentinel = sentinel.New(
+		mcSrv.BlockChain(), mcSrv.config.VaultsConfig,
+		chainDb, mcSrv.dkg, config.LocalRpc, config.XchainKey,
+	)
 
 	log.Debugf("create new protocol manager")
 	if mcSrv.ProtocolManager, err = NewProtocolManager(

@@ -17,10 +17,13 @@
 package core
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"math/big"
 
 	"github.com/MOACChain/MoacLib/common"
+	"github.com/MOACChain/MoacLib/log"
+	"github.com/MOACChain/MoacLib/rlp"
 	"github.com/MOACChain/MoacLib/types"
 	"github.com/MOACChain/xchain/dkg"
 )
@@ -69,8 +72,10 @@ type SigShares []*dkg.SigShareMessage
 
 type VaultEvents []*VaultEvent
 
+type VaultEventWithSigs []*VaultEventWithSig
+
 type VaultEvent struct {
-	Vault         common.Address `json:"vault"  gencodec:"required"`
+	Vault         common.Address `json:"vault"          gencodec:"required"`
 	SourceChainid *big.Int       `json:"sourcechainid"  gencodec:"required"`
 	SourceToken   common.Address `json:"sourcetoken"    gencodec:"required"`
 	MappedChainid *big.Int       `json:"mappedchainid"  gencodec:"required"`
@@ -78,11 +83,60 @@ type VaultEvent struct {
 	To            common.Address `json:"to"             gencodec:"required"`
 	Amount        *big.Int       `json:"amount"         gencodec:"required"`
 	Nonce         *big.Int       `json:"nonce"          gencodec:"required"`
-	Data          []byte         `json:"data"           gencodec:"required"`
+	BlockNumber   *big.Int       `json:"blockNumber"    gencodec:"required"`
 }
 
 func (vaultEvent *VaultEvent) Hash() common.Hash {
 	return common.RlpHash(vaultEvent)
+}
+
+func (vaultEvent *VaultEvent) TokenMapping() string {
+	return fmt.Sprintf(
+		"%d,%x,%d,%x",
+		vaultEvent.SourceChainid,
+		vaultEvent.SourceToken.Bytes(),
+		vaultEvent.MappedChainid,
+		vaultEvent.MappedToken.Bytes(),
+	)
+}
+
+func (vaultEvent *VaultEvent) TokenMappingSha256() [32]byte {
+	h := sha256.New()
+	h.Write([]byte(vaultEvent.TokenMapping()))
+	sha := h.Sum(nil)
+	var sha32 [32]byte
+	copy(sha32[:], sha)
+	return sha32
+}
+
+func (vaultEvent *VaultEvent) TokenMappingWithVault() string {
+	return fmt.Sprintf(
+		"%x,%d,%x,%d,%x",
+		vaultEvent.Vault.Bytes(),
+		vaultEvent.SourceChainid,
+		vaultEvent.SourceToken.Bytes(),
+		vaultEvent.MappedChainid,
+		vaultEvent.MappedToken.Bytes(),
+	)
+}
+
+func (vaultEvent *VaultEvent) Bytes() []byte {
+	data, err := rlp.EncodeToBytes(vaultEvent)
+	if err != nil {
+		log.Errorf("vault event rlp encode, err:", err)
+		return []byte{}
+	}
+
+	return data
+}
+
+type VaultEventWithSig struct {
+	Event  VaultEvent `json:"event"  gencodec:"required"`
+	Blssig []byte     `json:"blssig"  gencodec:"required"`
+}
+
+func (vaultEventWithSig *VaultEventWithSig) Hash() common.Hash {
+	return common.RlpHash(vaultEventWithSig)
 }
 
 func (vaultEvent *VaultEvent) String() string {

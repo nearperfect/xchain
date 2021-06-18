@@ -31,8 +31,8 @@ import (
 	"github.com/MOACChain/xchain/accounts/abi/bind"
 	"github.com/MOACChain/xchain/accounts/keystore"
 	"github.com/MOACChain/xchain/mcclient"
-	"github.com/MOACChain/xchain/mcclient/xdefi"
 	"github.com/MOACChain/xchain/vnode/config"
+	"github.com/MOACChain/xchain/xdefi/vssbase"
 )
 
 // Pos is a consensus engine
@@ -64,7 +64,7 @@ type Pos struct {
 	client       *mcclient.Client
 	callOpts     *bind.CallOpts
 	transactOpts *bind.TransactOpts
-	vssbase      *xdefi.VssBase
+	vssbase      *vssbase.VssBase
 	vnodeconfig  *config.Configuration
 }
 
@@ -77,7 +77,7 @@ func New(cfg *config.Configuration, vssid common.Address, key *keystore.Key) *Po
 	} else {
 		log.Infof("Get vnode client with config: %s", url)
 	}
-	vssbase, _ := xdefi.NewVssBase(
+	vssbase, _ := vssbase.NewVssBase(
 		common.HexToAddress(cfg.VssBaseAddr),
 		client,
 	)

@@ -1025,6 +1025,9 @@ func SetMoacConfig(ctx *cli.Context, n *node.Node, cfg *mc.Config) {
 	if gen := ctx.GlobalInt(TrieCacheGenFlag.Name); gen > 0 {
 		state.MaxTrieCacheGen = uint16(gen)
 	}
+
+	// localprc
+	cfg.LocalRpc = n.RpcEndPoint()
 }
 
 // RegisterMoacService adds an MoacNode client to the node.
