@@ -332,10 +332,12 @@ var (
 	expDiffPeriod = big.NewInt(100000)
 	big1          = big.NewInt(1)
 	big2          = big.NewInt(2)
+	big4          = big.NewInt(4)
 	big9          = big.NewInt(9)
 	big10         = big.NewInt(10)
 	bigMinus99    = big.NewInt(-99)
 	big2999999    = big.NewInt(2999999)
+	BlockInterval = big4
 )
 
 // calcDifficultyPangu is the difficulty adjustment algorithm. It returns
@@ -357,7 +359,7 @@ func calcDifficultyPangu(config *params.ChainConfig, time uint64, parent *types.
 
 	// (2 if len(parent_uncles) else 1) - (block_timestamp - parent_timestamp) // 9
 	x.Sub(bigTime, bigParentTime)
-	x.Div(x, big9)
+	x.Div(x, BlockInterval)
 	if parent.UncleHash == types.EmptyUncleHash {
 		x.Sub(big1, x)
 	} else {

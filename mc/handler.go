@@ -809,7 +809,7 @@ func (pm *ProtocolManager) handleSubnetMsg(p *Peer, msg p2p.Msg) error {
 			}*/
 
 	case msg.Code == VaultEventMsg:
-		log.Infof("  vault event received !!!!!!!!!!!!!!")
+		log.Debugf("  vault event received !!!!!!!!!!!!!!")
 	case msg.Code == TxMsg:
 		var txs, txsShard []*types.Transaction
 		// Transactions can be processed, parse all of them and deliver to the pool
@@ -1180,7 +1180,7 @@ func (pm *ProtocolManager) handleMainnetMsg(p *Peer, msg p2p.Msg) error {
 		pm.txpool.AddRemotes(txs)
 
 	case msg.Code == VaultEventMsg:
-		log.Infof("  vault event received !!!!!!!!!!!!!!")
+		log.Debugf("  vault event received !!!!!!!!!!!!!!")
 		var vaultEventWithSigs []*core.VaultEventWithSig
 		// Parse all vault events
 		if err := msg.Decode(&vaultEventWithSigs); err != nil {
@@ -1189,8 +1189,7 @@ func (pm *ProtocolManager) handleMainnetMsg(p *Peer, msg p2p.Msg) error {
 
 		for _, vaultEventWithSig := range vaultEventWithSigs {
 			p.MarkVaultEventWithSigs(vaultEventWithSig.Hash())
-			batchNumber := uint64(0)
-			pm.sentinel.ProcessVaultEventWithSig(vaultEventWithSig, batchNumber)
+			pm.sentinel.ProcessVaultEventWithSig(vaultEventWithSig)
 			// sent to peers who don't have the event
 			pm.vaultEventWithSigCh <- *vaultEventWithSig
 		}
@@ -1354,7 +1353,7 @@ func (pm *ProtocolManager) vaultEventBroadcastLoop() {
 	for {
 		select {
 		case event := <-pm.vaultEventWithSigCh:
-			log.Infof(
+			log.Debugf(
 				"@@@@@@@@@@@@@@@@@@@@@!!!!!!!!!!!!!!!! broadcast vault event channel [seen=%d]: %x",
 				eventCount, event.Hash().Bytes()[:8],
 			)
