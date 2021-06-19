@@ -48,6 +48,7 @@ const (
 	MaxBlockNumber                       = uint64(1000000000000)
 	Gwei                                 = int64(1000000000)
 	BlockDelay                           = 12
+	MaxEmptyBatchBlocks                  = 200
 )
 
 var (
@@ -296,6 +297,17 @@ func (sentinel *Sentinel) scanOneRound(
 			}
 		}
 
+		// corner case where we scan many blocks but getting no events
+		if endBlock-startBlock >= MaxEmptyBatchBlocks && len(batch) == 0 {
+			return &VaultEventsBatch{
+				batch,
+				vaultContract,
+				startBlock,
+				endBlock,
+				storeCounter,
+			}
+		}
+
 		lastBlock += ScanStep
 	}
 }
@@ -434,6 +446,10 @@ func (sentinel *Sentinel) watchDeposit(
 			storeCounter,
 		)
 
+		if batch == nil {
+			continue
+		}
+
 		if !notMyTurn {
 			// # 2
 			omitted, committed, errors, transactor := sentinel.commitDepositBatch(
@@ -441,6 +457,10 @@ func (sentinel *Sentinel) watchDeposit(
 				xevents,
 				batch,
 			)
+
+			if transactor == nil {
+				continue
+			}
 
 			// # 3
 			wait := 0
