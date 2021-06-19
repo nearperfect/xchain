@@ -332,12 +332,12 @@ var (
 	expDiffPeriod = big.NewInt(100000)
 	big1          = big.NewInt(1)
 	big2          = big.NewInt(2)
-	big4          = big.NewInt(4)
+	big3          = big.NewInt(3)
 	big9          = big.NewInt(9)
 	big10         = big.NewInt(10)
 	bigMinus99    = big.NewInt(-99)
 	big2999999    = big.NewInt(2999999)
-	BlockInterval = big4
+	BlockInterval = big3
 )
 
 // calcDifficultyPangu is the difficulty adjustment algorithm. It returns
