@@ -17,12 +17,14 @@
 package sentinel
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 
+	"github.com/MOACChain/MoacLib/common"
 	"github.com/MOACChain/MoacLib/log"
 )
 
@@ -30,6 +32,13 @@ import (
 (chain x id, chain x rpc, chain prefix, vaultx contract address) <- watch deposit
 (chain y id, chain y rpc, chain prefix, vaulty contract address) <- watch burn
 */
+type TokenMapping struct {
+	SourceChainId uint64 `json:"sourcechainid"  gencodec:"required"`
+	SourceToken   string `json:"sourcetoken"  gencodec:"required"`
+	MappedChainId uint64 `json:"mappedchainid"  gencodec:"required"`
+	MappedToken   string `json:"mappedtoken"  gencodec:"required"`
+}
+
 type VaultConfig struct {
 	ChainId         uint64 `json:"id"  gencodec:"required"`
 	ChainRPC        string `json:"rpc"  gencodec:"required"`
@@ -38,8 +47,9 @@ type VaultConfig struct {
 }
 
 type VaultPairConfig struct {
-	VaultX VaultConfig `json:"vaultx"  gencodec:"required"`
-	VaultY VaultConfig `json:"vaulty"  gencodec:"required"`
+	VaultX        VaultConfig    `json:"vaultx"  gencodec:"required"`
+	VaultY        VaultConfig    `json:"vaulty"  gencodec:"required"`
+	TokenMappings []TokenMapping `json:"tokenmappings"  gencodec:"required"`
 }
 
 type VaultPairListConfig struct {
@@ -55,6 +65,26 @@ func (pair *VaultPairConfig) Id() string {
 		pair.VaultY.ChainId,
 		pair.VaultY.VaultAddress,
 	)
+}
+
+func (pair *TokenMapping) String() string {
+	// x chainid, x vault addr, y chainid, y vault addr
+	return fmt.Sprintf(
+		"%d,%x,%d,%x",
+		pair.SourceChainId,
+		common.HexToAddress(pair.SourceToken).Bytes(),
+		pair.MappedChainId,
+		common.HexToAddress(pair.MappedToken).Bytes(),
+	)
+}
+
+func (pair *TokenMapping) Sha256() [32]byte {
+	h := sha256.New()
+	h.Write([]byte(pair.String()))
+	sha := h.Sum(nil)
+	var sha32 [32]byte
+	copy(sha32[:], sha)
+	return sha32
 }
 
 func GetConfiguration(configFilePath string) (*VaultPairListConfig, error) {

@@ -25,19 +25,31 @@ import (
 
 func main() {
 	vaultX := sentinel.VaultConfig{
-		56,
-		"https://data-seed-prebsc-2-s3.binance.org:8545",
-		"eth",
+		95125,
+		"http://172.21.0.11:8545",
+		"mc",
 		"0xABE1A1A941C9666ac221B041aC1cFE6167e1F1D0",
 	}
 	vaultY := sentinel.VaultConfig{
 		95125,
-		"http://172.20.0.11:8545",
+		"http://172.21.0.11:8545",
 		"mc",
-		"0x1B041aC1cFE6167e1F1D0ABE1A1A941C9666ac22",
+		"0xcCa8BAA2d1E83A38bdbcF52a9e5BbB530f50493A",
 	}
 
-	vaultPairs := []sentinel.VaultPairConfig{sentinel.VaultPairConfig{vaultX, vaultY}}
+	tokenMapping := sentinel.TokenMapping{
+		95125,
+		"0x350e47237eb2515b3b30c2f232268b998e392409",
+		95125,
+		"0x8553ce822a9072b5ff0992da9a61d5ce54a1f5df",
+	}
+	vaultPairs := []sentinel.VaultPairConfig{
+		sentinel.VaultPairConfig{
+			vaultX,
+			vaultY,
+			[]sentinel.TokenMapping{tokenMapping},
+		},
+	}
 	vaults := sentinel.VaultPairListConfig{vaultPairs}
 
 	result, _ := json.Marshal(vaults)

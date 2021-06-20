@@ -84,6 +84,7 @@ type VaultEvent struct {
 	Amount        *big.Int       `json:"amount"         gencodec:"required"`
 	Nonce         *big.Int       `json:"nonce"          gencodec:"required"`
 	BlockNumber   *big.Int       `json:"blockNumber"    gencodec:"required"`
+	Tip           *big.Int       `json:"tip"            gencodec:"required"`
 }
 
 func (vaultEvent *VaultEvent) Hash() common.Hash {
