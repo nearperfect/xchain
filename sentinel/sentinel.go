@@ -148,70 +148,44 @@ func (sentinel *Sentinel) PrintVaultEventsReceived() {
 }
 
 func (sentinel *Sentinel) prepareClients(
-	xChainId uint64,
-	xChainFuncPrefix string,
-	xChainRPC string,
-	yChainId uint64,
-	yChainFuncPrefix string,
-	yChainRPC string,
-) (*mcclient.Client, *mcclient.Client, *mcclient.Client) {
-	var clientX *mcclient.Client
+	ChainId uint64,
+	ChainFuncPrefix string,
+	ChainRPC string,
+) (*mcclient.Client, *mcclient.Client) {
+	var client *mcclient.Client
 	var err error
-	if xChainId != 0 {
-		clientX, err = mcclient.Dial(xChainRPC)
-		if err != nil {
-			log.Errorf("Unable to connect to network:%v\n", err)
-			return nil, nil, nil
-		}
-		clientX.SetFuncPrefix(xChainFuncPrefix)
-		// sanity check chain id
-		chainId_, err := clientX.ChainID(context.Background())
-		if err != nil {
-			log.Errorf("------------client chain id err: %v -----------------", err)
-			return nil, nil, nil
-		}
-		if xChainId != chainId_.Uint64() {
-			log.Errorf(
-				"Chain ID does not match, have: %d, want: %d, check vaultx.json and restart",
-				chainId_, xChainId,
-			)
-			return nil, nil, nil
-		}
+
+	client, err = mcclient.Dial(ChainRPC)
+	if err != nil {
+		log.Errorf("Unable to connect to network:%v\n", err)
+		return nil, nil
 	}
-	var clientY *mcclient.Client
-	if yChainId != 0 {
-		clientY, err = mcclient.Dial(yChainRPC)
-		if err != nil {
-			log.Errorf("Unable to connect to network:%v\n", err)
-			return nil, nil, nil
-		}
-		clientY.SetFuncPrefix(yChainFuncPrefix)
-		// sanity check chain id
-		chainId_, err := clientY.ChainID(context.Background())
-		if err != nil {
-			log.Errorf("------------client chain id err: %v -----------------", err)
-			return nil, nil, nil
-		}
-		if yChainId != chainId_.Uint64() {
-			log.Errorf(
-				"Chain ID does not match, have: %d, want: %d, check vaultx.json and restart",
-				chainId_, yChainId,
-			)
-			return nil, nil, nil
-		}
+	client.SetFuncPrefix(ChainFuncPrefix)
+	// sanity check chain id
+	chainId_, err := client.ChainID(context.Background())
+	if err != nil {
+		log.Errorf("------------client chain id err: %v -----------------", err)
+		return nil, nil
 	}
+	if ChainId != chainId_.Uint64() {
+		log.Errorf(
+			"Chain ID does not match, have: %d, want: %d, check vaultx.json and restart",
+			chainId_, ChainId,
+		)
+		return nil, nil
+	}
+
 	clientXevents, err := mcclient.Dial(sentinel.rpc)
 	if err != nil {
 		log.Errorf("------------client x err: %v %s-----------------", err, sentinel.rpc)
-		return nil, nil, nil
+		return nil, nil
 	}
-	return clientX, clientY, clientXevents
+	return client, clientXevents
 }
 
 func (sentinel *Sentinel) prepareContracts(
 	vaultXAddr common.Address,
 	vaultYAddr common.Address,
-	needXevents bool,
 	clientX *mcclient.Client,
 	clientY *mcclient.Client,
 	clientXevents *mcclient.Client,
@@ -243,17 +217,17 @@ func (sentinel *Sentinel) prepareContracts(
 	} else {
 		vaultyContract = nil
 	}
-	var xeventsContract *xevents.XEvents
-	if needXevents {
-		xeventsContract, err = xevents.NewXEvents(
-			XeventsXYAddr,
-			clientXevents,
-		)
-		if err != nil {
-			log.Errorf("------------client new xevents contract err: %v -----------------", err)
-			return nil, nil, nil
-		}
+
+	// xevents contract
+	xeventsContract, err := xevents.NewXEvents(
+		XeventsXYAddr,
+		clientXevents,
+	)
+	if err != nil {
+		log.Errorf("------------client new xevents contract err: %v -----------------", err)
+		return nil, nil, nil
 	}
+
 	return vaultxContract, vaultyContract, xeventsContract
 }
 
@@ -333,20 +307,15 @@ func (sentinel *Sentinel) prepareWatchDeposit(
 	xVaultAddr common.Address,
 ) (*mcclient.Client, *mcclient.Client, *vaultx.VaultX,
 	*xevents.XEvents, bool, uint64, uint64) {
-	clientX, _, clientXevents := sentinel.prepareClients(
+	clientX, clientXevents := sentinel.prepareClients(
 		xChainId,
 		xChainFuncPrefix,
 		xChainRPC,
-		0,
-		"",
-		"",
 	)
 
-	needXevents := true
 	vaultxContract, _, xeventsContract := sentinel.prepareContracts(
 		xVaultAddr,
 		common.Address{},
-		needXevents,
 		clientX,
 		nil,
 		clientXevents,
@@ -542,7 +511,7 @@ func (sentinel *Sentinel) scanDeposit(
 	}
 }
 
-func (sentinel *Sentinel) watchDeposit(
+func (sentinel *Sentinel) watchVault(
 	chainId uint64,
 	chainFuncPrefix string,
 	chainRPC string,
@@ -809,20 +778,15 @@ func (sentinel *Sentinel) doMint(
 ) {
 	defer log.Errorf("*********************END CALL MINT***********************")
 	for {
-		_, clientY, clientXevents := sentinel.prepareClients(
-			0,
-			"",
-			"",
+		clientY, clientXevents := sentinel.prepareClients(
 			yChainId,
 			yChainFuncPrefix,
 			yChainRPC,
 		)
 
-		needXevents := true
 		_, vaultyContract, xeventsContract := sentinel.prepareContracts(
 			common.Address{},
 			yVaultAddr,
-			needXevents,
 			nil,
 			clientY,
 			clientXevents,
@@ -1072,7 +1036,7 @@ func (sentinel *Sentinel) start() {
 		// deposit
 		vaultx := vaultPairConfig.VaultX
 		vaulty := vaultPairConfig.VaultY
-		go sentinel.watchDeposit(
+		go sentinel.watchVault(
 			vaultx.ChainId,
 			vaultx.ChainFuncPrefix,
 			vaultx.ChainRPC,
