@@ -52,6 +52,7 @@ const (
 	BlockDelay                           = 12
 	MaxEmptyBatchBlocks                  = 200
 	MintBatchSize                        = 5
+	MintIntervalBlocks                   = 50
 )
 
 var (
@@ -280,24 +281,24 @@ func (sentinel *Sentinel) ProcessVaultEventWithSig(
 	return vaultEventHash
 }
 
-func (sentinel *Sentinel) shouldIStore(batchNumber uint64) bool {
+func (sentinel *Sentinel) myTurn(number uint64) bool {
 	// use node index to determine if this node should update xevents this round
 	// batchNumber's value should be consistent between validators
 	nodeIndex, nodeCount := sentinel.dkg.FindAddressInNodelist(sentinel.dkg.Vssid)
-	shouldIStore := false
+	myTurn := false
 	if nodeIndex == -1 {
 		log.Errorf(
-			"------------shouldIStore err: index: %d, count: %d, last block: %d-----------------",
+			"----------- My turn err: index: %d, count: %d, last block: %d-----------------",
 			nodeIndex,
 			nodeCount,
-			batchNumber,
+			number,
 		)
 		return false
 	} else {
-		shouldIStore = batchNumber%uint64(nodeCount) == uint64(nodeIndex)
+		myTurn = number%uint64(nodeCount) == uint64(nodeIndex)
 	}
 
-	return shouldIStore
+	return myTurn
 }
 
 func (sentinel *Sentinel) scanDeposit(
@@ -508,7 +509,7 @@ func (sentinel *Sentinel) prepareWatchDeposit(
 		storeCounter = counter.Uint64()
 	}
 
-	notMyTurn := !sentinel.shouldIStore(lastBlock)
+	notMyTurn := !sentinel.myTurn(lastBlock)
 	if notMyTurn {
 		log.Errorf("------------Not my turn, scan only %d --------------", lastBlock)
 	} else {
@@ -617,24 +618,76 @@ type EventData struct {
 	BlockNumber *big.Int
 }
 
-func (sentinel *Sentinel) scanMint(
+func (sentinel *Sentinel) scanAndCallMint(
+	clientXevents *mcclient.Client,
+	clientY *mcclient.Client,
 	xevents *xevents.XEvents,
-	clienty *mcclient.Client,
-	vaulty *vaulty.VaultY,
-	vault common.Address,
-	tokenMappingSha256 [32]byte,
+	vaultY *vaulty.VaultY,
+	xVaultAddr common.Address,
+	tokenMapping TokenMapping,
 ) {
 	callOpts := &bind.CallOpts{}
-	waterMark, err := xevents.MintWatermark(callOpts, vault, tokenMappingSha256)
+	waterMark, err := vaultY.TokenMappingWatermark(
+		callOpts,
+		common.HexToAddress(tokenMapping.SourceToken),
+		common.HexToAddress(tokenMapping.MappedToken),
+	)
 	if err != nil {
 		log.Errorf("-------------- mint watermark err: %v--------------", err)
+		return
+	}
+	log.Errorf("-----------Mint watermark: %d, %s, %s------------------------------",
+		waterMark,
+		tokenMapping.SourceToken,
+		tokenMapping.MappedToken,
+	)
+	xchainBlockNumber, err := clientXevents.BlockNumber(context.Background())
+	if err != nil {
+		log.Errorf("---------------Can not get xchain block number, NO MINT ----------------")
 	}
 
+	// each node will mint for n blocks, then hand it over to next node
+	if !sentinel.myTurn(xchainBlockNumber / MintIntervalBlocks) {
+		log.Errorf("---------Not My Turn to Mint: %d ------------------",
+			sentinel.batchNumber,
+		)
+		return
+	} else {
+		log.Errorf("---------My Turn to Mint !!!!: %d ------------------",
+			sentinel.batchNumber,
+		)
+	}
+
+	// setup transactor
+	gasPrice := int64(5) // 5gwei
+	gasLimit := int64(300000)
+	transactor, nonceAt := sentinel.getTransactor(clientY, gasPrice, gasLimit)
+	if transactor == nil {
+		return
+	}
+	transactor.Nonce = big.NewInt(int64(nonceAt))
+
+	// check balance
+	balance, err := clientY.BalanceAt(context.Background(), sentinel.key.Address, nil)
+	if err != nil {
+		return
+	}
+	//  if we don't have money, return
+	if balance.Uint64() == 0 {
+		log.Errorf(
+			"---------------No balance for account on Vault Y chain: %x--------------------",
+			sentinel.key.Address,
+		)
+		return
+	}
+
+	committed := uint64(0)
+	errors := uint64(0)
 	for i := int64(0); i < int64(MintBatchSize); i++ {
 		var vaultEvent core.VaultEvent
 		vaultEventData, err := xevents.VaultEvents(
-			callOpts, vault,
-			tokenMappingSha256,
+			callOpts, xVaultAddr,
+			tokenMapping.Sha256(),
 			big.NewInt(waterMark.Int64()+i),
 		)
 		if err != nil {
@@ -642,14 +695,85 @@ func (sentinel *Sentinel) scanMint(
 		}
 		rlp.DecodeBytes(vaultEventData.EventData, &vaultEvent)
 		log.Errorf(
-			"-----------TO MINT: nonce: %d amount: %d, tip: %d, to: %x, mappedToken: %x----------------",
+			"-----------TO MINT: nonce: %d amount: %d, tip: %d, to: %x, mappedToken: %x-------------",
 			big.NewInt(waterMark.Int64()+i),
 			vaultEvent.Amount,
 			vaultEvent.Tip,
 			vaultEvent.To,
 			vaultEvent.MappedToken,
 		)
+		// if no more vault event
+		if vaultEvent.Amount == nil || vaultEvent.Amount.Int64() == 0 {
+			break
+		} else {
+			tx, err := vaultY.Mint(
+				transactor,
+				vaultEvent.SourceToken,
+				vaultEvent.MappedToken,
+				vaultEvent.To,
+				vaultEvent.Amount,
+				vaultEvent.Tip,
+				vaultEvent.Nonce,
+			)
+			transactor.Nonce = big.NewInt(transactor.Nonce.Int64() + 1)
+
+			if err != nil {
+				errors += 1
+				log.Errorf("---------------sentinel vault Y mint tx err: %v ------------------", err)
+			} else {
+				log.Errorf(
+					"---------sentinel vault Y mint() tx: %x, from: %x, nonce: %d ---------",
+					tx.Hash(), sentinel.key.Address.Bytes(), tx.Nonce(),
+				)
+				committed += 1
+			}
+		}
 	}
+
+	waterMarkBefore := waterMark.Int64()
+	// wait for watermark to update
+	for {
+		if committed == 0 {
+			log.Errorf("--------------No vault Y mint tx called-------------------")
+			break
+		}
+		waterMark, _ := vaultY.TokenMappingWatermark(
+			callOpts,
+			common.HexToAddress(tokenMapping.SourceToken),
+			common.HexToAddress(tokenMapping.MappedToken),
+		)
+		log.Errorf(
+			"---------Vault Y watermark: %d, before: %d, committed: %d ---------",
+			waterMark, waterMarkBefore, committed,
+		)
+		time.Sleep(10 * time.Second)
+	}
+}
+
+func (sentinel *Sentinel) getTransactor(
+	client *mcclient.Client,
+	gasPrice int64,
+	gasLimit int64,
+) (*bind.TransactOpts, uint64) {
+	chainId, err := client.ChainID(context.Background())
+	if err != nil {
+		return nil, 0
+	}
+
+	// build transactor
+	transactor, _ := bind.NewKeyedTransactorWithChainID(
+		sentinel.key.PrivateKey,
+		chainId,
+	)
+	transactor.GasPrice = big.NewInt(gasPrice * Gwei)
+	transactor.GasLimit = uint64(gasLimit)
+
+	nonceAt, err := client.NonceAt(context.Background(), sentinel.key.Address, nil)
+	if err != nil {
+		return nil, 0
+	}
+
+	return transactor, nonceAt
 }
 
 func (sentinel *Sentinel) doMint(
@@ -689,12 +813,13 @@ func (sentinel *Sentinel) doMint(
 			return
 		}
 
-		sentinel.scanMint(
-			xeventsContract,
+		sentinel.scanAndCallMint(
+			clientXevents,
 			clientY,
+			xeventsContract,
 			vaultyContract,
 			xVaultAddr,
-			tokenMapping.Sha256(),
+			tokenMapping,
 		)
 		time.Sleep(VaultCheckInterval * time.Second)
 	}
