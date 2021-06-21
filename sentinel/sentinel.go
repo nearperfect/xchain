@@ -155,6 +155,32 @@ func (sentinel *Sentinel) PrintVaultEventsReceived() {
 	}
 }
 
+func (sentinel *Sentinel) getTransactor(
+	client *mcclient.Client,
+	gasPrice int64,
+	gasLimit int64,
+) (*bind.TransactOpts, uint64) {
+	chainId, err := client.ChainID(context.Background())
+	if err != nil {
+		return nil, 0
+	}
+
+	// build transactor
+	transactor, _ := bind.NewKeyedTransactorWithChainID(
+		sentinel.key.PrivateKey,
+		chainId,
+	)
+	transactor.GasPrice = big.NewInt(gasPrice * Gwei)
+	transactor.GasLimit = uint64(gasLimit)
+
+	nonceAt, err := client.NonceAt(context.Background(), sentinel.key.Address, nil)
+	if err != nil {
+		return nil, 0
+	}
+
+	return transactor, nonceAt
+}
+
 func (sentinel *Sentinel) prepareClients(
 	ChainId uint64,
 	ChainFuncPrefix string,
@@ -526,6 +552,174 @@ func (sentinel *Sentinel) scanDeposit(
 	}
 }
 
+func (sentinel *Sentinel) commitDepositBatch(
+	client *mcclient.Client,
+	xevents *xevents.XEvents,
+	batch *VaultEventsBatch,
+) (uint64, uint64, uint64, *bind.TransactOpts) {
+	logX2Y(
+		"-----------Vault X commit batch BEGIN from %d to %d ]-----------------",
+		batch.StartBlockNumber,
+		batch.EndBlockNumber,
+	)
+	defer logX2Y(
+		"-----------Vault X commit batch END from %d to %d-----------------",
+		batch.StartBlockNumber,
+		batch.EndBlockNumber,
+	)
+
+	// sanity check chain id
+	chainId, err := client.ChainID(context.Background())
+	if err != nil {
+		log.Errorf("------------client chain id err: %v -----------------", err)
+		return 0, 0, 0, nil
+	}
+
+	balance, err := client.BalanceAt(context.Background(), sentinel.key.Address, nil)
+	if err != nil {
+		return 0, 0, 0, nil
+	}
+	nonceAt, err := client.NonceAt(context.Background(), sentinel.key.Address, nil)
+	if err != nil {
+		return 0, 0, 0, nil
+	}
+	logX2Y(
+		"---------  %x, balance: %d, nonce: %d, chainId: %d ----------",
+		sentinel.key.Address.Bytes(), balance, nonceAt, chainId,
+	)
+	//  if we don't have money, return
+	if balance.Uint64() == 0 {
+		return 0, 0, 0, nil
+	}
+	callOpts := &bind.CallOpts{}
+	vaultWatermark, err := xevents.VaultWatermark(
+		callOpts, XeventsXYAddr,
+	)
+	if err != nil {
+		log.Errorf("------------client watermark block err: %v -----------------", err)
+		return 0, 0, 0, nil
+	}
+	// prevent re-entry
+	if vaultWatermark.Uint64() >= batch.StartBlockNumber {
+		log.Errorf(
+			"---------------Vault X skip batch commit: vault: %d, batch number: %d ----------",
+			vaultWatermark.Uint64(),
+			batch.StartBlockNumber,
+		)
+		return 0, 0, 0, nil
+	}
+
+	// build transactor
+	transactor, _ := bind.NewKeyedTransactorWithChainID(
+		sentinel.key.PrivateKey,
+		chainId,
+	)
+	transactor.GasPrice = big.NewInt(5 * Gwei)
+	transactor.GasLimit = uint64(300000)
+	transactor.Nonce = big.NewInt(int64(nonceAt))
+
+	// order the commit sequence by nonce
+	nonce := 0
+	nonces := make([]int, 0)
+	noncesMap := make(map[int]common.Hash)
+	for vaultEventHash, _ := range batch.Batch {
+		vaultEventWithSig := sentinel.VaultEvents[vaultEventHash]
+		vaultEvent := vaultEventWithSig.Event
+		nonce = int(vaultEvent.Nonce.Int64())
+		nonces = append(nonces, int(vaultEvent.Nonce.Int64()))
+		noncesMap[nonce] = vaultEventHash
+		logX2Y(
+			"------------- Vault event: vault: %x, tokenMapping: %s, sha256: %x, nonce: %d ---------------",
+			vaultEvent.Vault,
+			vaultEvent.TokenMapping(),
+			vaultEvent.TokenMappingSha256(),
+			vaultEvent.Nonce,
+		)
+	}
+	sort.Ints(nonces)
+
+	var vaultEventHash common.Hash
+	logX2Y("-------------- Vault X nonces: %v -------------", nonces)
+
+	committed := uint64(0)
+	errors := uint64(0)
+	omitted := uint64(0)
+	// commit all events
+	for _, nonce := range nonces {
+		vaultEventHash = noncesMap[nonce]
+		vaultEventWithSig := sentinel.VaultEvents[vaultEventHash]
+		vaultEvent := vaultEventWithSig.Event
+
+		callOpts := &bind.CallOpts{}
+		watermark, err := xevents.VaultEventWatermark(
+			callOpts, vaultEvent.Vault, vaultEvent.TokenMappingSha256(),
+		)
+		if err != nil {
+			log.Errorf("-----------------Vault X watermark err: %v -------------", err)
+		} else {
+			logX2Y(
+				"---------Vault X  tokenmapping watermark %d, this tokenmappin nonce: %d ----",
+				watermark, vaultEvent.Nonce,
+			)
+		}
+
+		if watermark.Int64() > vaultEvent.Nonce.Int64() {
+			omitted += 1
+			logX2Y(
+				"---------------- Vault X tokenmappin nonce low, omitted: %d------------------",
+				vaultEvent.Nonce.Int64(),
+			)
+		}
+		/*
+			if watermark.Int64() < vaultEvent.Nonce.Int64() {
+				log.Errorf(
+					"---------------- Vault X tokenmappin nonce high, omitted: %d------------------",
+					vaultEvent.Nonce.Int64(),
+				)
+				sentinel.resetStore(
+					xevents,
+					transactor,
+					vaultEvent.Vault,
+					vaultEvent.TokenMappingSha256(),
+					vaultEvent.Nonce,
+				)
+				time.Sleep(10 * time.Second)
+				return 0, 0, 0, nil
+			}*/
+
+		logX2Y(
+			"-------------- Vault X Store tx: vault: %x, tokenmapping: %x, nonce: %d, block: %d---------",
+			vaultEvent.Vault.Bytes()[:8],
+			vaultEvent.TokenMappingSha256(),
+			vaultEvent.Nonce,
+			vaultEvent.BlockNumber,
+		)
+		tx, err := xevents.Store(
+			transactor,
+			vaultEventWithSig.Blssig,
+			vaultEvent.Vault,
+			vaultEvent.Nonce,
+			vaultEvent.TokenMappingSha256(),
+			vaultEvent.BlockNumber,
+			vaultEvent.Bytes(),
+		)
+		transactor.Nonce = big.NewInt(transactor.Nonce.Int64() + 1)
+
+		if err != nil {
+			errors += 1
+			log.Errorf("------------Vault X sentinel xevents store err: %v ------------------", err)
+		} else {
+			logX2Y(
+				"---------Vault X sentinel xevents store tx: %x, from: %x, nonce: %d ---------",
+				tx.Hash(), sentinel.key.Address.Bytes(), tx.Nonce(),
+			)
+			committed += 1
+		}
+	}
+
+	return omitted, committed, errors, transactor
+}
+
 func (sentinel *Sentinel) watchVault(
 	chainId uint64,
 	chainFuncPrefix string,
@@ -765,32 +959,6 @@ func (sentinel *Sentinel) scanAndCallMint(
 	}
 }
 
-func (sentinel *Sentinel) getTransactor(
-	client *mcclient.Client,
-	gasPrice int64,
-	gasLimit int64,
-) (*bind.TransactOpts, uint64) {
-	chainId, err := client.ChainID(context.Background())
-	if err != nil {
-		return nil, 0
-	}
-
-	// build transactor
-	transactor, _ := bind.NewKeyedTransactorWithChainID(
-		sentinel.key.PrivateKey,
-		chainId,
-	)
-	transactor.GasPrice = big.NewInt(gasPrice * Gwei)
-	transactor.GasLimit = uint64(gasLimit)
-
-	nonceAt, err := client.NonceAt(context.Background(), sentinel.key.Address, nil)
-	if err != nil {
-		return nil, 0
-	}
-
-	return transactor, nonceAt
-}
-
 func (sentinel *Sentinel) doMint(
 	yChainId uint64,
 	yChainFuncPrefix string,
@@ -833,174 +1001,6 @@ func (sentinel *Sentinel) doMint(
 			tokenMapping,
 		)
 	}
-}
-
-func (sentinel *Sentinel) commitDepositBatch(
-	client *mcclient.Client,
-	xevents *xevents.XEvents,
-	batch *VaultEventsBatch,
-) (uint64, uint64, uint64, *bind.TransactOpts) {
-	logX2Y(
-		"-----------Vault X commit batch BEGIN from %d to %d ]-----------------",
-		batch.StartBlockNumber,
-		batch.EndBlockNumber,
-	)
-	defer logX2Y(
-		"-----------Vault X commit batch END from %d to %d-----------------",
-		batch.StartBlockNumber,
-		batch.EndBlockNumber,
-	)
-
-	// sanity check chain id
-	chainId, err := client.ChainID(context.Background())
-	if err != nil {
-		log.Errorf("------------client chain id err: %v -----------------", err)
-		return 0, 0, 0, nil
-	}
-
-	balance, err := client.BalanceAt(context.Background(), sentinel.key.Address, nil)
-	if err != nil {
-		return 0, 0, 0, nil
-	}
-	nonceAt, err := client.NonceAt(context.Background(), sentinel.key.Address, nil)
-	if err != nil {
-		return 0, 0, 0, nil
-	}
-	logX2Y(
-		"---------  %x, balance: %d, nonce: %d, chainId: %d ----------",
-		sentinel.key.Address.Bytes(), balance, nonceAt, chainId,
-	)
-	//  if we don't have money, return
-	if balance.Uint64() == 0 {
-		return 0, 0, 0, nil
-	}
-	callOpts := &bind.CallOpts{}
-	vaultWatermark, err := xevents.VaultWatermark(
-		callOpts, XeventsXYAddr,
-	)
-	if err != nil {
-		log.Errorf("------------client watermark block err: %v -----------------", err)
-		return 0, 0, 0, nil
-	}
-	// prevent re-entry
-	if vaultWatermark.Uint64() >= batch.StartBlockNumber {
-		log.Errorf(
-			"---------------Vault X skip batch commit: vault: %d, batch number: %d ----------",
-			vaultWatermark.Uint64(),
-			batch.StartBlockNumber,
-		)
-		return 0, 0, 0, nil
-	}
-
-	// build transactor
-	transactor, _ := bind.NewKeyedTransactorWithChainID(
-		sentinel.key.PrivateKey,
-		chainId,
-	)
-	transactor.GasPrice = big.NewInt(5 * Gwei)
-	transactor.GasLimit = uint64(300000)
-	transactor.Nonce = big.NewInt(int64(nonceAt))
-
-	// order the commit sequence by nonce
-	nonce := 0
-	nonces := make([]int, 0)
-	noncesMap := make(map[int]common.Hash)
-	for vaultEventHash, _ := range batch.Batch {
-		vaultEventWithSig := sentinel.VaultEvents[vaultEventHash]
-		vaultEvent := vaultEventWithSig.Event
-		nonce = int(vaultEvent.Nonce.Int64())
-		nonces = append(nonces, int(vaultEvent.Nonce.Int64()))
-		noncesMap[nonce] = vaultEventHash
-		logX2Y(
-			"------------- Vault event: vault: %x, tokenMapping: %s, sha256: %x, nonce: %d ---------------",
-			vaultEvent.Vault,
-			vaultEvent.TokenMapping(),
-			vaultEvent.TokenMappingSha256(),
-			vaultEvent.Nonce,
-		)
-	}
-	sort.Ints(nonces)
-
-	var vaultEventHash common.Hash
-	logX2Y("-------------- Vault X nonces: %v -------------", nonces)
-
-	committed := uint64(0)
-	errors := uint64(0)
-	omitted := uint64(0)
-	// commit all events
-	for _, nonce := range nonces {
-		vaultEventHash = noncesMap[nonce]
-		vaultEventWithSig := sentinel.VaultEvents[vaultEventHash]
-		vaultEvent := vaultEventWithSig.Event
-
-		callOpts := &bind.CallOpts{}
-		watermark, err := xevents.VaultEventWatermark(
-			callOpts, vaultEvent.Vault, vaultEvent.TokenMappingSha256(),
-		)
-		if err != nil {
-			log.Errorf("-----------------Vault X watermark err: %v -------------", err)
-		} else {
-			logX2Y(
-				"---------Vault X  tokenmapping watermark %d, this tokenmappin nonce: %d ----",
-				watermark, vaultEvent.Nonce,
-			)
-		}
-
-		if watermark.Int64() > vaultEvent.Nonce.Int64() {
-			omitted += 1
-			logX2Y(
-				"---------------- Vault X tokenmappin nonce low, omitted: %d------------------",
-				vaultEvent.Nonce.Int64(),
-			)
-		}
-		/*
-			if watermark.Int64() < vaultEvent.Nonce.Int64() {
-				log.Errorf(
-					"---------------- Vault X tokenmappin nonce high, omitted: %d------------------",
-					vaultEvent.Nonce.Int64(),
-				)
-				sentinel.resetStore(
-					xevents,
-					transactor,
-					vaultEvent.Vault,
-					vaultEvent.TokenMappingSha256(),
-					vaultEvent.Nonce,
-				)
-				time.Sleep(10 * time.Second)
-				return 0, 0, 0, nil
-			}*/
-
-		logX2Y(
-			"-------------- Vault X Store tx: vault: %x, tokenmapping: %x, nonce: %d, block: %d---------",
-			vaultEvent.Vault.Bytes()[:8],
-			vaultEvent.TokenMappingSha256(),
-			vaultEvent.Nonce,
-			vaultEvent.BlockNumber,
-		)
-		tx, err := xevents.Store(
-			transactor,
-			vaultEventWithSig.Blssig,
-			vaultEvent.Vault,
-			vaultEvent.Nonce,
-			vaultEvent.TokenMappingSha256(),
-			vaultEvent.BlockNumber,
-			vaultEvent.Bytes(),
-		)
-		transactor.Nonce = big.NewInt(transactor.Nonce.Int64() + 1)
-
-		if err != nil {
-			errors += 1
-			log.Errorf("------------Vault X sentinel xevents store err: %v ------------------", err)
-		} else {
-			logX2Y(
-				"---------Vault X sentinel xevents store tx: %x, from: %x, nonce: %d ---------",
-				tx.Hash(), sentinel.key.Address.Bytes(), tx.Nonce(),
-			)
-			committed += 1
-		}
-	}
-
-	return omitted, committed, errors, transactor
 }
 
 func (sentinel *Sentinel) resetStore(
