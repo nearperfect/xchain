@@ -2,7 +2,8 @@
 
 
 ## 1. 编译
-代码库改为使用go module作为依赖管理, 直接执行make命令可以编译，go会自动获取依赖包
+代码库从vnode修改，但改为使用go module作为依赖管理, 直接执行make命令可以编译，go会自动获取依赖包
+
 bls_lib包如果go无法自动获得，可以在go.mod文件中用replace语句切换到本地路径上的包
 ```bash
 make xchain

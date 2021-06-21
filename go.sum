@@ -2,6 +2,8 @@ cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMT
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/MOACChain/MoacLib v1.0.5 h1:yt238wf/XPliQ/1JuOzRri6jxKPAEXI5p+h26HqGuIg=
 github.com/MOACChain/MoacLib v1.0.5/go.mod h1:63irc302J+w98pSD4OcmiV0pTgtH+SWwHqqe3HE39yc=
+github.com/MOACChain/MoacLib v1.0.999 h1:48A62uaVgdfZD5ArBhoUNX1i4ILouNTy/Ltf0Ow41xw=
+github.com/MOACChain/MoacLib v1.0.999/go.mod h1:63irc302J+w98pSD4OcmiV0pTgtH+SWwHqqe3HE39yc=
 github.com/aead/siphash v1.0.1/go.mod h1:Nywa3cDsYNNK3gaciGTWPwHt0wlpNV15vwmswBAUSII=
 github.com/aristanetworks/goarista v0.0.0-20160916080930-938504403730 h1:rob0vYGIX0dpLwAKLzTIWYkyg6JnXVmaW9ht4FwmABg=
 github.com/aristanetworks/goarista v0.0.0-20160916080930-938504403730/go.mod h1:D/tb0zPVXnP7fmsLZjtdUhSsumbK/ij54UXjjVgMGxQ=
@@ -66,6 +68,8 @@ github.com/hpcloud/tail v1.0.0/go.mod h1:ab1qPbhIpdTxEkNHXyeSf5vhxWSCs/tWer42PpO
 github.com/huin/goupnp v1.0.0 h1:wg75sLpL6DZqwHQN6E1Cfk6mtfzS45z8OV+ic+DtHRo=
 github.com/huin/goupnp v1.0.0/go.mod h1:n9v9KO1tAxYH82qOn+UTIFQDmx5n1Zxd/ClZDMX7Bnc=
 github.com/huin/goutil v0.0.0-20170803182201-1ca381bf3150/go.mod h1:PpLOETDnJ0o3iZrZfqZzyLl6l7F3c6L1oWn7OICBi6o=
+github.com/innowells/bls_lib/v2 v2.0.999 h1:sY6XmOJBBnR6TW+Xc9PBE5A0MrXM2BCUknzMLhE9f1Y=
+github.com/innowells/bls_lib/v2 v2.0.999/go.mod h1:rNF9G0On0Ny31kd1ksSiFi7a5ywtjRFpfxMM2PMGC60=
 github.com/jackpal/go-nat-pmp v1.0.2 h1:KzKSgb7qkJvOUTqYl9/Hg/me3pWgBmERKrTGD7BdWus=
 github.com/jackpal/go-nat-pmp v1.0.2/go.mod h1:QPH045xvCAeXUZOxsnwmrtiCoxIr9eob+4orBN1SBKc=
 github.com/jessevdk/go-flags v0.0.0-20141203071132-1679536dcc89/go.mod h1:4FA24M0QyGHXBuZZK/XkWh8h0e1EYbRYJSGM75WSRxI=

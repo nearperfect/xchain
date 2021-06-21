@@ -915,9 +915,8 @@ func (dkg *DKG) UpdateVSSConfig() int {
 	if err != nil {
 		log.Errorf("vss updateVssConfig() failed with %v", err)
 		return VssConfigRecheck
-	} else {
-		log.Errorf("pubshares [%d]", pubshares)
 	}
+
 	pubShareCount := 1
 	for addr, publicShares := range pubshares {
 		// need the pubkey of the sender to verify the received share
@@ -938,7 +937,6 @@ func (dkg *DKG) UpdateVSSConfig() int {
 		}
 		pubShareCount++
 	}
-	log.Errorf("pubShareCount %d", pubShareCount)
 
 	// get all private shares, including non-active ones
 	allPrivateShares := make([]*[]*share.PriShare, 0)
@@ -996,7 +994,6 @@ func (dkg *DKG) UpdateVSSConfig() int {
 		}
 		priShareCount++
 	}
-	log.Errorf("priShareCount %d", priShareCount)
 	// create a new curve suite
 	suite := bn256.NewSuite()
 
@@ -1506,7 +1503,6 @@ func (dkg *DKG) verifyShares(
 	// verify received pub and pri shares
 	notVerify := make(map[common.Address]*share.PriShare)
 	for sender, pubshares := range verifyPublicShares {
-		log.Errorf("sender: %x, pubshares %v", sender, pubshares)
 		for _, pubshare := range *pubshares {
 			// locate the pubshare for this node
 			if pubshare.I == sciBls.NodeIndex {
