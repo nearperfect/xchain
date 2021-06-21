@@ -467,15 +467,22 @@ func (sentinel *Sentinel) scanDeposit(
 				event.From,
 				event.Amount,
 				event.Nonce,
-				event.Tip,
 				event.BlockNumber,
+				event.Tip,
 			}
 			blssig := sentinel.dkg.Bls.SignBytes(vaultEvent.Hash().Bytes())
 			vaultEventWithSig := core.VaultEventWithSig{
 				vaultEvent,
 				blssig,
 			}
-
+			logX2Y(
+				"-------Scanned vault event: %x, nonce: %x, block: %d, source: %x, mapped: %x--------",
+				vaultXAddr,
+				event.Nonce,
+				event.BlockNumber,
+				event.SourceToken,
+				event.MappedToken,
+			)
 			// process the event in this sentinel, include this node itself.
 			vaultEventHash := sentinel.ProcessVaultEventWithSig(&vaultEventWithSig)
 			batch[vaultEventHash] = true
@@ -537,6 +544,14 @@ func (sentinel *Sentinel) watchVault(
 				chainRPC,
 				vaultXAddr,
 			)
+
+		if clientX == nil || clientXevents == nil || vaultX == nil || xevents == nil {
+			log.Errorf(
+				"-------Before scan deposit: one of clients/contracts is nil: %v, # %v, # %v, # %v -----",
+				clientX, clientXevents, vaultX, xevents,
+			)
+			continue
+		}
 
 		// # 1
 		batch := sentinel.scanDeposit(
@@ -786,6 +801,8 @@ func (sentinel *Sentinel) doMint(
 ) {
 	defer logX2Y("*********************END CALL MINT***********************")
 	for {
+		time.Sleep(VaultCheckInterval * time.Second)
+
 		clientY, clientXevents := sentinel.prepareClients(
 			yChainId,
 			yChainFuncPrefix,
@@ -802,10 +819,10 @@ func (sentinel *Sentinel) doMint(
 
 		if clientY == nil || clientXevents == nil || vaultyContract == nil || xeventsContract == nil {
 			log.Errorf(
-				"---------do mint: one of clients/contracts is nil: %v, # %v, # %v, # %v ----------------",
+				"---------Do mint: one of clients/contracts is nil: %v, # %v, # %v, # %v ----------------",
 				clientY, clientXevents, vaultyContract, xeventsContract,
 			)
-			return
+			continue
 		}
 
 		sentinel.scanAndCallMint(
@@ -815,7 +832,6 @@ func (sentinel *Sentinel) doMint(
 			xVaultAddr,
 			tokenMapping,
 		)
-		time.Sleep(VaultCheckInterval * time.Second)
 	}
 }
 
@@ -937,12 +953,29 @@ func (sentinel *Sentinel) commitDepositBatch(
 				vaultEvent.Nonce.Int64(),
 			)
 		}
+		/*
+			if watermark.Int64() < vaultEvent.Nonce.Int64() {
+				log.Errorf(
+					"---------------- Vault X tokenmappin nonce high, omitted: %d------------------",
+					vaultEvent.Nonce.Int64(),
+				)
+				sentinel.resetStore(
+					xevents,
+					transactor,
+					vaultEvent.Vault,
+					vaultEvent.TokenMappingSha256(),
+					vaultEvent.Nonce,
+				)
+				time.Sleep(10 * time.Second)
+				return 0, 0, 0, nil
+			}*/
 
 		logX2Y(
-			"-------------- Vault X Store tx: vault: %x, tokenmapping: %x, nonce: %d---------",
+			"-------------- Vault X Store tx: vault: %x, tokenmapping: %x, nonce: %d, block: %d---------",
 			vaultEvent.Vault.Bytes()[:8],
 			vaultEvent.TokenMappingSha256(),
 			vaultEvent.Nonce,
+			vaultEvent.BlockNumber,
 		)
 		tx, err := xevents.Store(
 			transactor,
@@ -968,6 +1001,44 @@ func (sentinel *Sentinel) commitDepositBatch(
 	}
 
 	return omitted, committed, errors, transactor
+}
+
+func (sentinel *Sentinel) resetStore(
+	xevents *xevents.XEvents,
+	transactor *bind.TransactOpts,
+	vault common.Address,
+	tokenMappingSha256 [32]byte,
+	nonce *big.Int,
+) {
+	nonceToUse := nonce.Int64()
+	for {
+		logX2Y("-------------Reset search for nonce: %d----------", nonceToUse)
+		var vaultEvent core.VaultEvent
+		callOpts := &bind.CallOpts{}
+		vaultEventData, _ := xevents.VaultEvents(
+			callOpts,
+			vault,
+			tokenMappingSha256,
+			big.NewInt(nonceToUse),
+		)
+		logX2Y("%v", vaultEventData)
+		rlp.DecodeBytes(vaultEventData.EventData, &vaultEvent)
+		if (vaultEvent.To != common.Address{}) {
+			targetBlock := big.NewInt(vaultEvent.BlockNumber.Int64() - 10)
+			logX2Y(
+				"----------Reset xevenx vault watermark to %d -------------",
+				targetBlock,
+			)
+			xevents.UpdateVaultWatermark(
+				transactor,
+				vault,
+				targetBlock,
+			)
+			break
+		} else {
+			nonceToUse -= 1
+		}
+	}
 }
 
 func (sentinel *Sentinel) watchBurn(
