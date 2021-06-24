@@ -92,6 +92,10 @@ type Sentinel struct {
 
 	// [0x123][123, 456] => true
 	VaultScanBlocks map[common.Address]map[string]bool
+
+	// Rpc stats
+	RpcCallPerClient map[string]map[string]int
+	RpcCallStatMu    sync.RWMutex
 }
 
 type EventData struct {
@@ -155,38 +159,35 @@ type XdefiContext struct {
 	XeventsYX     *xevents.XEvents
 }
 
-func logX2Y(from, to common.Address, format string, args ...interface{}) {
-	all := append([]interface{}{from.Bytes()[:4], to.Bytes()[:4]}, args...)
-	log.Infof("[Vault X[%x] -> Y[%x]] "+format, all...)
-}
-
-func logY2X(from, to common.Address, format string, args ...interface{}) {
-	all := append([]interface{}{from.Bytes()[:4], to.Bytes()[:4]}, args...)
-	log.Infof("[Vault Y[%x] -> X[%x]] "+format, all...)
-}
-
 func (xdefiContext *XdefiContext) IsDeposit() bool {
 	return xdefiContext.EventType == DEPOSIT
+}
+
+func logX2Y(name string, from, to common.Address, format string, args ...interface{}) {
+	all := []interface{}{name, from.Bytes()[:3], to.Bytes()[:3]}
+	all = append(all, args...)
+	log.Infof(" %s %x -> %x "+format, all...)
 }
 
 func (xdefiContext *XdefiContext) LogFunc() func(format string, args ...interface{}) {
 	var fromAddr common.Address
 	var toAddr common.Address
+	var name string
 	if xdefiContext.IsDeposit() {
+		name = "X -> Y"
 		fromAddr = xdefiContext.Config.VaultXAddr
 		toAddr = xdefiContext.Config.VaultYAddr
-		ret := func(format string, args ...interface{}) {
-			logX2Y(fromAddr, toAddr, format, args)
-		}
-		return ret
+
 	} else {
 		fromAddr = xdefiContext.Config.VaultYAddr
 		toAddr = xdefiContext.Config.VaultXAddr
-		ret := func(format string, args ...interface{}) {
-			logX2Y(fromAddr, toAddr, format, args)
-		}
-		return ret
+		name = "Y -> X"
 	}
+
+	ret := func(format string, args ...interface{}) {
+		logX2Y(name, fromAddr, toAddr, format, args...)
+	}
+	return ret
 }
 
 func (xdefiContext *XdefiContext) Xevents() *xevents.XEvents {
@@ -251,7 +252,7 @@ func (xdefiContext *XdefiContext) PrepareClients() {
 	// sanity check chain id
 	xchainId_, err := xclient.ChainID(context.Background())
 	if err != nil {
-		log.Errorf("[PrepareClients]------------client chain id err: %v -----------------", err)
+		log.Errorf("[PrepareClients]\t client chain id err: %v", err)
 		return
 	}
 	if xChainId != xchainId_.Uint64() {
@@ -271,7 +272,7 @@ func (xdefiContext *XdefiContext) PrepareClients() {
 	// sanity check chain id
 	ychainId_, err := yclient.ChainID(context.Background())
 	if err != nil {
-		log.Errorf("[PrepareClients]------------client chain id err: %v -----------------", err)
+		log.Errorf("[PrepareClients]\t client chain id err: %v", err)
 		return
 	}
 	if yChainId != ychainId_.Uint64() {
@@ -284,7 +285,7 @@ func (xdefiContext *XdefiContext) PrepareClients() {
 
 	clientXevents, err := mcclient.Dial(xdefiContext.Sentinel.Rpc)
 	if err != nil {
-		log.Errorf("[PrepareClients]------------client x err: %v %s-----------------", err, xdefiContext.Sentinel.Rpc)
+		log.Errorf("[PrepareClients]\t client x err: %v %s", err, xdefiContext.Sentinel.Rpc)
 		return
 	}
 
@@ -307,7 +308,7 @@ func (xdefiContext *XdefiContext) PrepareContracts() {
 		clientX,
 	)
 	if err != nil {
-		log.Errorf("[PrepareContracts]------------client new vault X contract err: %v -----------------", err)
+		log.Errorf("[PrepareContracts]\t client new vault X contract err: %v", err)
 		return
 	}
 
@@ -316,7 +317,7 @@ func (xdefiContext *XdefiContext) PrepareContracts() {
 		clientY,
 	)
 	if err != nil {
-		log.Errorf("[PrepareContracts]------------client new vault Y contract err: %v -----------------", err)
+		log.Errorf("[PrepareContracts]\t client new vault Y contract err: %v", err)
 		return
 	}
 
@@ -326,7 +327,7 @@ func (xdefiContext *XdefiContext) PrepareContracts() {
 		clientXevents,
 	)
 	if err != nil {
-		log.Errorf("[PrepareContracts]------------client new xevents XY contract err: %v -----------------", err)
+		log.Errorf("[PrepareContracts]\t client new xevents XY contract err: %v", err)
 		return
 	}
 
@@ -335,7 +336,7 @@ func (xdefiContext *XdefiContext) PrepareContracts() {
 		clientXevents,
 	)
 	if err != nil {
-		log.Errorf("[PrepareContracts]------------client new xevents YX contract err: %v -----------------", err)
+		log.Errorf("[PrepareContracts]\t client new xevents YX contract err: %v", err)
 		return
 	}
 
@@ -357,7 +358,7 @@ func (xdefiContext *XdefiContext) IsReady() bool {
 
 	if oneIsNil {
 		log.Errorf(
-			"[IsReady]---------Prepare common context: one of clients/contracts is nil: %v, # %v, # %v, # %v, # %v, # %v # %v ------------",
+			"[IsReady]\t Prepare common context: one of clients/contracts is nil: %v, # %v, # %v, # %v, # %v, # %v # %v       ",
 			xdefiContext.ClientX, xdefiContext.ClientY, xdefiContext.ClientXevents,
 			xdefiContext.VaultX, xdefiContext.VaultY,
 			xdefiContext.XeventsXY, xdefiContext.XeventsYX,
@@ -388,6 +389,7 @@ func New(
 		dkg:                  dkg,
 		key:                  key,
 		Rpc:                  "http://" + rpc,
+		RpcCallPerClient:     make(map[string]map[string]int),
 		VaultScanBlocks:      make(map[common.Address]map[string]bool),
 		VaultEventsBatchChan: make(chan VaultEventsBatch, VaultEventsBatchChanSize),
 		PersistSeenVaultEventWithSigChan: make(
@@ -419,6 +421,29 @@ func (sentinel *Sentinel) PrintVaultEventsReceived() {
 	}
 }
 
+func (sentinel *Sentinel) LogRpcStat(client, method string) {
+	sentinel.RpcCallStatMu.Lock()
+	defer sentinel.RpcCallStatMu.Unlock()
+	if clientStat, found := sentinel.RpcCallPerClient[client]; found {
+		clientStat[method] += 1
+	} else {
+		clientStat := make(map[string]int)
+		clientStat[method] += 1
+		sentinel.RpcCallPerClient[client] = clientStat
+	}
+}
+
+func (sentinel *Sentinel) PrintRpcStat() {
+	for client, clientStat := range sentinel.RpcCallPerClient {
+		allCount := 0
+		for method, count := range clientStat {
+			log.Infof("[RPC] \t%s => [%s]:\t %d", client, method, count)
+			allCount += count
+		}
+		log.Infof("[RPC] \t%s => ALL:\t\t %d", client, allCount)
+	}
+}
+
 func (sentinel *Sentinel) getTransactor(
 	client *mcclient.Client,
 	gasPrice int64,
@@ -428,6 +453,7 @@ func (sentinel *Sentinel) getTransactor(
 	if err != nil {
 		return nil
 	}
+	sentinel.LogRpcStat("vault", "ChainID")
 
 	// build transactor
 	transactor, _ := bind.NewKeyedTransactorWithChainID(
@@ -438,6 +464,7 @@ func (sentinel *Sentinel) getTransactor(
 	transactor.GasLimit = uint64(gasLimit)
 
 	nonceAt, err := client.NonceAt(context.Background(), sentinel.key.Address, nil)
+	sentinel.LogRpcStat("vault", "NonceAt")
 	if err != nil {
 		return nil
 	}
@@ -484,7 +511,7 @@ func (sentinel *Sentinel) myTurn(number uint64) bool {
 	myTurn := false
 	if nodeIndex == -1 {
 		log.Errorf(
-			"----------- My turn err: index: %d, count: %d, last block: %d-----------------",
+			"[myTurn]\t My turn err: index: %d, count: %d, last block: %d",
 			nodeIndex,
 			nodeCount,
 			number,
@@ -558,8 +585,9 @@ func (sentinel *Sentinel) initVaultParams(xdefiContext *XdefiContext) (uint64, u
 	vaultAddrFrom := xdefiContext.VaultAddrFrom()
 	callOpts := &bind.CallOpts{}
 	vaultWatermark, err := xevents.VaultWatermark(callOpts, vaultAddrFrom)
+	sentinel.LogRpcStat("xevents", "VaultWatermark")
 	if err != nil {
-		log.Errorf("[initVaultParams]------------client watermark block err: %v -----------------", err)
+		log.Errorf("[initVaultParams]\t client watermark block err: %v       -----", err)
 		return 0, 0
 	}
 
@@ -571,12 +599,14 @@ func (sentinel *Sentinel) initVaultParams(xdefiContext *XdefiContext) (uint64, u
 	if vaultWatermark.Uint64() == 0 {
 		if xdefiContext.IsDeposit() {
 			createdAt, err = xdefiContext.VaultX.CreatedAt(callOpts)
+			sentinel.LogRpcStat("vault", "CreateAt")
 		} else {
 			createdAt, err = xdefiContext.VaultY.CreatedAt(callOpts)
+			sentinel.LogRpcStat("vault", "CreateAt")
 		}
 		if err != nil {
 			log.Errorf(
-				"[initVaultParams]------------client CreateAt err: %v, set lastBlock to %d-----------------",
+				"[initVaultParams]\t client CreateAt err: %v, set lastBlock to %d",
 				err, lastBlock,
 			)
 			return 0, 0
@@ -593,8 +623,9 @@ func (sentinel *Sentinel) initVaultParams(xdefiContext *XdefiContext) (uint64, u
 		counter, err := xevents.VaultStoreCounter(
 			callOpts, vaultAddrFrom, big.NewInt(int64(batchNumber)),
 		)
+		sentinel.LogRpcStat("xevents", "VaultStoreCounter")
 		if err != nil {
-			log.Errorf("[initVaultParams]---------------client vault store counter error %v------------", err)
+			log.Errorf("[initVaultParams]\t client vault store counter error %v      ", err)
 			return 0, 0
 		}
 		storeCounter = counter.Uint64()
@@ -630,7 +661,7 @@ func (sentinel *Sentinel) scanVaultEvents(
 		currentBlock, err := clientFrom.BlockNumber(context.Background())
 		if err != nil {
 			log.Errorf(
-				"[scanVaultEvents]----------------- sentinel: unable to get current block number from chain: %v ---------------", err)
+				"[scanVaultEvents]\t  sentinel: unable to get current block number from chain: %v", err)
 		}
 		if lastBlock > currentBlock {
 			return nil
@@ -651,7 +682,7 @@ func (sentinel *Sentinel) scanVaultEvents(
 			End:     &endBlock,
 		}
 
-		logFunc("[scanVaultEvents]--------------- filter opts:[batch=%d], start: %d, end: %d-----------",
+		logFunc("[scanVaultEvents]\t filter opts:[batch=%d], start: %d, end: %d",
 			startBlock, lastBlock, endBlock,
 		)
 
@@ -664,15 +695,16 @@ func (sentinel *Sentinel) scanVaultEvents(
 				[]common.Address{},
 				[]*big.Int{},
 			)
+			sentinel.LogRpcStat("vault", "FilterTokenDeposit")
 
 			if err != nil {
 				log.Errorf(
-					"[scanVaultEvents]--------------- sentinel: unable to get token deposit iterator: %v ------------", err)
+					"[scanVaultEvents]\t sentinel: unable to get token deposit iterator: %v", err)
 				return nil
 			}
 
 			if !sentinel.dkg.IsVSSReady() {
-				log.Errorf("[scanVaultEvents]------------------ sentinel: unable to get bls signer: %v ----------", err)
+				log.Errorf("[scanVaultEvents]\t sentinel: unable to get bls signer: %v", err)
 				return nil
 			}
 
@@ -697,7 +729,7 @@ func (sentinel *Sentinel) scanVaultEvents(
 					blssig,
 				}
 				logFunc(
-					"[scanVaultEvents]-------Scanned vault event: %x, nonce: %d, block: %d, source: %x, mapped: %x--------",
+					"[scanVaultEvents]\t Scanned vault event: %x, nonce: %d, block: %d, source: %x, mapped: %x",
 					vaultAddrFrom,
 					event.Nonce,
 					event.BlockNumber,
@@ -711,7 +743,7 @@ func (sentinel *Sentinel) scanVaultEvents(
 				// broad cast to other nodes
 				sentinel.vaultEventWithSigFeed.Send(vaultEventWithSig)
 			}
-			logFunc("[scanVaultEvents]---------------- raw filter result: batch size = %d--------------", len(batch))
+			logFunc("[scanVaultEvents]\t raw filter result: batch size = %d", len(batch))
 		} else {
 			itrY, err := vaultY.FilterTokenBurn(
 				filterOpts,
@@ -719,15 +751,16 @@ func (sentinel *Sentinel) scanVaultEvents(
 				[]common.Address{},
 				[]*big.Int{},
 			)
+			sentinel.LogRpcStat("vault", "FilterTokenBurn")
 
 			if err != nil {
 				log.Errorf(
-					"[scanVaultEvents]--------------- sentinel: unable to get token burn iterator: %v ------------", err)
+					"[scanVaultEvents]\t sentinel: unable to get token burn iterator: %v", err)
 				return nil
 			}
 
 			if !sentinel.dkg.IsVSSReady() {
-				log.Errorf("[scanVaultEvents]------------------ sentinel: unable to get bls signer: %v ----------", err)
+				log.Errorf("[scanVaultEvents]\t sentinel: unable to get bls signer: %v", err)
 				return nil
 			}
 
@@ -752,7 +785,7 @@ func (sentinel *Sentinel) scanVaultEvents(
 					blssig,
 				}
 				logFunc(
-					"[scanVaultEvents]-------Scanned vault event: %x, nonce: %d, block: %d, source: %x, mapped: %x--------",
+					"[scanVaultEvents]\t Scanned vault event: %x, nonce: %d, block: %d, source: %x, mapped: %x",
 					vaultAddrFrom,
 					event.Nonce,
 					event.BlockNumber,
@@ -766,14 +799,14 @@ func (sentinel *Sentinel) scanVaultEvents(
 				// broad cast to other nodes
 				sentinel.vaultEventWithSigFeed.Send(vaultEventWithSig)
 			}
-			logFunc("[scanVaultEvents]---------------- raw filter result: batch size = %d--------------", len(batch))
+			logFunc("[scanVaultEvents]\t raw filter result: batch size = %d", len(batch))
 		}
 
 		// once we receive the batch with events,
 		// scan for this round is done, just return
 		if sentinel.batchNumber != 0 && len(batch) > 0 {
 			logFunc(
-				"[scanVaultEvents]----------- New batch mined (commit = %t), number: %d, start: %d, end: %d, events: %d -------------",
+				"[scanVaultEvents]\t New batch mined (commit = %t), number: %d, start: %d, end: %d, events: %d",
 				sentinel.myTurn(MyTurnSeed),
 				sentinel.batchNumber,
 				startBlock,
@@ -813,12 +846,12 @@ func (sentinel *Sentinel) commitBatch(
 	logFunc := xdefiContext.LogFunc()
 
 	logFunc(
-		"[commitBatch]-----------Vault FROM commit batch BEGIN from %d to %d ]-----------------",
+		"[  commitBatch  ]\t Vault FROM commit batch BEGIN from %d to %d ]",
 		batch.StartBlockNumber,
 		batch.EndBlockNumber,
 	)
 	defer logFunc(
-		"[commitBatch]-----------Vault FROM commit batch END from %d to %d-----------------",
+		"[  commitBatch  ]\t Vault FROM commit batch END from %d to %d",
 		batch.StartBlockNumber,
 		batch.EndBlockNumber,
 	)
@@ -826,7 +859,7 @@ func (sentinel *Sentinel) commitBatch(
 	// sanity check chain id
 	chainId, err := clientXevents.ChainID(context.Background())
 	if err != nil {
-		log.Errorf("[commitBatch]------------client xevents chain id err: %v -----------------", err)
+		log.Errorf("[  commitBatch  ]\t client xevents chain id err: %v", err)
 		return 0, 0, 0, nil
 	}
 
@@ -839,7 +872,7 @@ func (sentinel *Sentinel) commitBatch(
 		return 0, 0, 0, nil
 	}
 	logFunc(
-		"[commitBatch]---------  %x, balance: %d, nonce: %d, chainId: %d ----------",
+		"[  commitBatch  ]\t   %x, balance: %d, nonce: %d, chainId: %d",
 		sentinel.key.Address.Bytes(), balance, nonceAt, chainId,
 	)
 	//  if we don't have money, return
@@ -850,14 +883,15 @@ func (sentinel *Sentinel) commitBatch(
 	vaultWatermark, err := xevents.VaultWatermark(
 		callOpts, XeventsXYAddr,
 	)
+	sentinel.LogRpcStat("xevents", "VaultWatermark")
 	if err != nil {
-		log.Errorf("[commitBatch]------------client watermark block err: %v -----------------", err)
+		log.Errorf("[  commitBatch  ]\t client watermark block err: %v", err)
 		return 0, 0, 0, nil
 	}
 	// prevent re-entry
 	if vaultWatermark.Uint64() >= batch.StartBlockNumber {
 		log.Errorf(
-			"[commitBatch]---------------Vault FROM skip batch commit: vault: %d, batch number: %d ----------",
+			"[  commitBatch  ]\t Vault FROM skip batch commit: vault: %d, batch number: %d       -",
 			vaultWatermark.Uint64(),
 			batch.StartBlockNumber,
 		)
@@ -882,7 +916,7 @@ func (sentinel *Sentinel) commitBatch(
 		nonces = append(nonces, int(vaultEvent.Nonce.Int64()))
 		noncesMap[nonce] = vaultEventHash
 		logFunc(
-			"[commitBatch]------------- Vault event: vault: %x, tokenMapping: %s, sha256: %x, nonce: %d ---------------",
+			"[  commitBatch  ]\t Vault event: vault: %x, tokenMapping: %s, sha256: %x, nonce: %d",
 			vaultEvent.Vault,
 			vaultEvent.TokenMapping(),
 			vaultEvent.TokenMappingSha256(),
@@ -892,7 +926,7 @@ func (sentinel *Sentinel) commitBatch(
 	sort.Ints(nonces)
 
 	var vaultEventHash common.Hash
-	logFunc("[commitBatch]-------------- Vault FROM nonces: %v -------------", nonces)
+	logFunc("[  commitBatch  ]\t Vault FROM nonces: %v", nonces)
 
 	committed := uint64(0)
 	errors := uint64(0)
@@ -907,11 +941,12 @@ func (sentinel *Sentinel) commitBatch(
 		vaultEventWatermark, err := xevents.VaultEventWatermark(
 			callOpts, vaultEvent.Vault, vaultEvent.TokenMappingSha256(),
 		)
+		sentinel.LogRpcStat("xevents", "VaultEventWatermark")
 		if err != nil {
-			log.Errorf("[commitBatch]-----------------Vault FROM watermark err: %v -------------", err)
+			log.Errorf("[  commitBatch  ]\t Vault FROM watermark err: %v", err)
 		} else {
 			logFunc(
-				"[commitBatch]---------xevents tokenmapping watermark %d, this tokenmapping nonce: %d ----",
+				"[  commitBatch  ]\t xevents tokenmapping watermark %d, this tokenmapping nonce: %d",
 				vaultEventWatermark, vaultEvent.Nonce,
 			)
 		}
@@ -919,14 +954,14 @@ func (sentinel *Sentinel) commitBatch(
 		if vaultEventWatermark.Int64() > vaultEvent.Nonce.Int64() {
 			omitted += 1
 			logFunc(
-				"[commitBatch]---------------- xevents tokenmapping nonce low, omitted: %d------------------",
+				"[  commitBatch  ]\t xevents tokenmapping nonce low, omitted: %d",
 				vaultEvent.Nonce.Int64(),
 			)
 			continue
 		}
 
 		logFunc(
-			"[commitBatch]--------- xevents Store tx: vault: %x, tokenmapping: %x, nonce: %d, block: %d, %d, %d -------",
+			"[  commitBatch  ]\t  xevents Store tx: vault: %x, tokenmapping: %x, nonce: %d, block: %d, %d, %d",
 			vaultEvent.Vault.Bytes()[:8],
 			vaultEvent.TokenMappingSha256(),
 			vaultEvent.Nonce,
@@ -943,14 +978,15 @@ func (sentinel *Sentinel) commitBatch(
 			vaultEvent.BlockNumber,
 			vaultEvent.Bytes(),
 		)
+		sentinel.LogRpcStat("xevents", "Store")
 		transactor.Nonce = big.NewInt(transactor.Nonce.Int64() + 1)
 
 		if err != nil {
 			errors += 1
-			log.Errorf("[commitBatch]------------Vault FROM sentinel xevents store err: %v ------------------", err)
+			log.Errorf("[  commitBatch  ]\t Vault FROM sentinel xevents store err: %v", err)
 		} else {
 			logFunc(
-				"[commitBatch]---------Vault FROM sentinel xevents store tx: %x, from: %x, nonce: %d ---------",
+				"[  commitBatch  ]\t Vault FROM sentinel xevents store tx: %x, from: %x, nonce: %d       ",
 				tx.Hash(), sentinel.key.Address.Bytes(), tx.Nonce(),
 			)
 			committed += 1
@@ -964,6 +1000,7 @@ func (sentinel *Sentinel) watchVault(xdefiContext *XdefiContext) {
 	logFunc := xdefiContext.LogFunc()
 	defer logFunc("*********************END WATCH LOOP***********************")
 	for {
+		sentinel.PrintRpcStat()
 		// sleep for interval
 		time.Sleep(VaultCheckInterval * time.Second)
 
@@ -999,9 +1036,10 @@ func (sentinel *Sentinel) watchVault(xdefiContext *XdefiContext) {
 				time.Sleep(3 * time.Second)
 				callOpts := &bind.CallOpts{}
 				newStoreCounter, err := xevents.StoreCounter(callOpts)
+				sentinel.LogRpcStat("vault", "storeCounter")
 				if err == nil {
 					logFunc(
-						"[watchVault]------- Before vault watermark commit, store counter %d, prev %d, batch size: %d, omitted: %d, commit %d, errors: %d -----------",
+						"[  In WatchVault  ]\t Before vault watermark commit, store counter %d, prev %d, batch size: %d, omitted: %d, commit %d, errors: %d",
 						newStoreCounter,
 						batch.StoreCounter,
 						len(batch.Batch),
@@ -1016,7 +1054,7 @@ func (sentinel *Sentinel) watchVault(xdefiContext *XdefiContext) {
 					newBatchPass := newStoreCounter.Uint64() == batch.StoreCounter+uint64(len(batch.Batch))
 					if oldBatchPass || newBatchPass {
 						logFunc(
-							"[watchVault]-------------------MOVE vault watermark HIGHER to %d---------------",
+							"[  In WatchVault  ]\t MOVE vault watermark HIGHER to %d",
 							batch.EndBlockNumber,
 						)
 						xevents.UpdateVaultWatermark(
@@ -1029,7 +1067,7 @@ func (sentinel *Sentinel) watchVault(xdefiContext *XdefiContext) {
 				}
 				wait += 1
 				if wait > 20 {
-					logFunc("[watchVault]--------------wait time out for storeCounter------------")
+					logFunc("[  In WatchVault  ]\t wait time out for storeCounter      ")
 					break
 				}
 			}
@@ -1037,7 +1075,7 @@ func (sentinel *Sentinel) watchVault(xdefiContext *XdefiContext) {
 	}
 }
 
-func (sentinel *Sentinel) scanAndForwardVaultEvents(
+func (sentinel *Sentinel) ForwardVaultEvents(
 	xdefiContext *XdefiContext,
 	tokenMapping TokenMapping,
 ) {
@@ -1055,11 +1093,12 @@ func (sentinel *Sentinel) scanAndForwardVaultEvents(
 			common.HexToAddress(tokenMapping.SourceToken),
 			common.HexToAddress(tokenMapping.MappedToken),
 		)
+		sentinel.LogRpcStat("vault", "TokenMappingWatermark")
 		if err != nil {
-			log.Errorf("[scanAndForwardVaultEvents]-------------- Vault TO watermark err: %v--------------", err)
+			log.Errorf("[ForwardVaultEvents]\t Vault TO: watermark err: %v", err)
 			return
 		}
-		logFunc("[scanAndForwardVaultEvents]-----------Vault TO watermark: %d, %s, %s------------------------------",
+		logFunc("[ForwardVaultEvents]\t Vault TO: watermark: %d, %s, %s",
 			waterMark,
 			tokenMapping.SourceToken,
 			tokenMapping.MappedToken,
@@ -1070,11 +1109,12 @@ func (sentinel *Sentinel) scanAndForwardVaultEvents(
 			common.HexToAddress(tokenMapping.SourceToken),
 			common.HexToAddress(tokenMapping.MappedToken),
 		)
+		sentinel.LogRpcStat("vault", "TokenMappingWatermark")
 		if err != nil {
-			log.Errorf("[scanAndForwardVaultEvents]-------------- Vault TO watermark err: %v--------------", err)
+			log.Errorf("[ForwardVaultEvents]\t Vault TO: watermark err: %v", err)
 			return
 		}
-		logFunc("[scanAndForwardVaultEvents]-----------Vault TO watermark: %d, %s, %s------------------------------",
+		logFunc("[ForwardVaultEvents]\t Vault TO: watermark: %d, %s, %s",
 			waterMark,
 			tokenMapping.SourceToken,
 			tokenMapping.MappedToken,
@@ -1084,10 +1124,10 @@ func (sentinel *Sentinel) scanAndForwardVaultEvents(
 
 	// each node will mint for n blocks, then hand it over to next node
 	if !sentinel.myTurn(MyTurnSeed) {
-		logFunc("[scanAndForwardVaultEvents]---------Vault TO Not My Turn to Mint ------------------")
+		logFunc("[ForwardVaultEvents]\t Vault TO: Not My Turn to Mint")
 		return
 	} else {
-		logFunc("[scanAndForwardVaultEvents]---------Vault TO My Turn to Mint ------------------")
+		logFunc("[ForwardVaultEvents]\t Vault TO: My Turn to Mint")
 	}
 
 	// setup transactor
@@ -1108,7 +1148,7 @@ func (sentinel *Sentinel) scanAndForwardVaultEvents(
 	//  if we don't have money, return
 	if balance.Uint64() == 0 {
 		log.Errorf(
-			"[scanAndForwardVaultEvents]---------------No balance for account on Vault TO chain: %x--------------------",
+			"[ForwardVaultEvents]\t No balance for account on Vault TO chain: %x",
 			sentinel.key.Address,
 		)
 		return
@@ -1123,17 +1163,18 @@ func (sentinel *Sentinel) scanAndForwardVaultEvents(
 			tokenMapping.Sha256(),
 			big.NewInt(waterMark.Int64()+i),
 		)
+		sentinel.LogRpcStat("xevents", "VaultEvents")
 		if err != nil {
-			log.Errorf("[scanAndForwardVaultEvents]------------ Xevents: retrieve vault events err: %v---------------", err)
+			log.Errorf("[ForwardVaultEvents]\t  Xevents: retrieve vault events err: %v", err)
 		}
 		rlp.DecodeBytes(vaultEventData.EventData, &vaultEvent)
 		logFunc(
-			"[scanAndForwardVaultEvents]-----------Vault [TO] TO MINT: nonce: %d amount: %d, tip: %d, to: %x, mappedToken: %x--------",
+			"[ForwardVaultEvents]\t Vault [TO] TO MINT: nonce: %d amount: %d, tip: %d, to: %x, mappedToken: %x",
 			big.NewInt(waterMark.Int64()+i),
 			vaultEvent.Amount,
 			vaultEvent.Tip,
-			vaultEvent.To,
-			vaultEvent.MappedToken,
+			vaultEvent.To.Bytes,
+			vaultEvent.MappedToken.Bytes,
 		)
 		// if no more vault event
 		if vaultEvent.Amount == nil || vaultEvent.Amount.Int64() == 0 {
@@ -1149,14 +1190,15 @@ func (sentinel *Sentinel) scanAndForwardVaultEvents(
 					vaultEvent.Tip,
 					vaultEvent.Nonce,
 				)
+				sentinel.LogRpcStat("vault", "Mint")
 				transactor.Nonce = big.NewInt(transactor.Nonce.Int64() + 1)
 
 				if err != nil {
 					errors += 1
-					log.Errorf("[scanAndForwardVaultEvents]---------------sentinel vault TO 'mint' tx err: %v ------------------", err)
+					log.Errorf("[ForwardVaultEvents]\t sentinel vault TO 'mint' tx err: %v", err)
 				} else {
 					logFunc(
-						"[scanAndForwardVaultEvents]---------sentinel vault [TO] mint() tx: %x, from: %x, nonce: %d, %d, %d ---------",
+						"[ForwardVaultEvents]\t sentinel vault [TO] mint() tx: %x, from: %x, nonce: %d, %d, %d       ",
 						tx.Hash(),
 						sentinel.key.Address.Bytes(),
 						tx.Nonce(),
@@ -1175,14 +1217,15 @@ func (sentinel *Sentinel) scanAndForwardVaultEvents(
 					vaultEvent.Tip,
 					vaultEvent.Nonce,
 				)
+				sentinel.LogRpcStat("vault", "Withdraw")
 				transactor.Nonce = big.NewInt(transactor.Nonce.Int64() + 1)
 
 				if err != nil {
 					errors += 1
-					log.Errorf("[scanAndForwardVaultEvents]---------------sentinel vault TO 'withdraw' tx err: %v ------------------", err)
+					log.Errorf("[ForwardVaultEvents]\t sentinel vault TO 'withdraw' tx err: %v", err)
 				} else {
 					logFunc(
-						"[scanAndForwardVaultEvents]---------sentinel vault TO withdraw() tx: %x, from: %x, nonce: %d, %d, %d ---------",
+						"[ForwardVaultEvents]\t sentinel vault TO withdraw() tx: %x, from: %x, nonce: %d, %d, %d       ",
 						tx.Hash(),
 						sentinel.key.Address.Bytes(),
 						tx.Nonce(),
@@ -1200,7 +1243,7 @@ func (sentinel *Sentinel) scanAndForwardVaultEvents(
 	wait := 0
 	for {
 		if committed == 0 {
-			logFunc("[scanAndForwardVaultEvents]--------------No vault TO mint/withdraw tx called-------------------")
+			logFunc("[ForwardVaultEvents]\t No vault TO mint/withdraw tx called")
 			break
 		}
 		var waterMark *big.Int
@@ -1210,8 +1253,9 @@ func (sentinel *Sentinel) scanAndForwardVaultEvents(
 				common.HexToAddress(tokenMapping.SourceToken),
 				common.HexToAddress(tokenMapping.MappedToken),
 			)
+			sentinel.LogRpcStat("vault", "TokenMappingWatermark")
 			logFunc(
-				"[scanAndForwardVaultEvents]---------Vault TO watermark: %d, before: %d, committed: %d ---------",
+				"[ForwardVaultEvents]\t Vault TO: watermark: %d, before: %d, committed: %d",
 				waterMark, waterMarkBefore, committed,
 			)
 		} else {
@@ -1220,13 +1264,14 @@ func (sentinel *Sentinel) scanAndForwardVaultEvents(
 				common.HexToAddress(tokenMapping.SourceToken),
 				common.HexToAddress(tokenMapping.MappedToken),
 			)
+			sentinel.LogRpcStat("vault", "TokenMappingWatermark")
 			logFunc(
-				"[scanAndForwardVaultEvents]---------Vault TO watermark: %d, before: %d, committed: %d ---------",
+				"[ForwardVaultEvents]\t Vault TO: watermark: %d, before: %d, committed: %d       ",
 				waterMark, waterMarkBefore, committed,
 			)
 		}
 		if err != nil {
-			log.Errorf("[scanAndForwardVaultEvents]---------Err with calling vault Y watermark: %v-----------", err)
+			log.Errorf("[ForwardVaultEvents]\t Err with calling vault Y watermark: %v", err)
 			continue
 		}
 		if waterMark.Uint64() == waterMarkBefore+committed {
@@ -1236,7 +1281,7 @@ func (sentinel *Sentinel) scanAndForwardVaultEvents(
 		wait += 1
 		if wait > 12 {
 			logFunc(
-				"[scanAndForwardVaultEvents]------Vault Y watermark wait time out, watermark: %d, before: %d, committed: %d ------",
+				"[ForwardVaultEvents]\t Vault Y watermark wait time out, watermark: %d, before: %d, committed: %d",
 				waterMark, waterMarkBefore, committed,
 			)
 			break
@@ -1251,21 +1296,7 @@ func (sentinel *Sentinel) doForward(
 	defer logFunc("*********************END LOOP Foward Vault Events***********************")
 	for {
 		time.Sleep(VaultCheckInterval * time.Second)
-
-		clientY := xdefiContext.ClientY
-		clientXevents := xdefiContext.Xevents()
-		vaultyContract := xdefiContext
-		xeventsContract := xdefiContext
-
-		if clientY == nil || clientXevents == nil || vaultyContract == nil || xeventsContract == nil {
-			log.Errorf(
-				"[doForward]---------Do Forward: one of clients/contracts is nil: %v, # %v, # %v, # %v -------",
-				clientY, clientXevents, vaultyContract, xeventsContract,
-			)
-			continue
-		}
-
-		sentinel.scanAndForwardVaultEvents(
+		sentinel.ForwardVaultEvents(
 			xdefiContext,
 			tokenMapping,
 		)
