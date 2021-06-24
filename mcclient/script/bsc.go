@@ -8,9 +8,10 @@ import (
 
 	"github.com/MOACChain/MoacLib/common"
 	"github.com/MOACChain/MoacLib/crypto"
-	"github.com/MOACChain/MoacLib/types"
-	//"github.com/MOACChain/xchain/accounts/abi/bind"
+	//"github.com/MOACChain/MoacLib/types"
+	"github.com/MOACChain/xchain/accounts/abi/bind"
 	"github.com/MOACChain/xchain/mcclient"
+	"github.com/MOACChain/xchain/xdefi/vaulty"
 )
 
 func main() {
@@ -54,36 +55,75 @@ func main() {
 	///////////////////////////////////////////////
 	///////////////////////////////////////////////
 	// build transactor
-	Gwei := int64(1000000000)
-	gasPrice := big.NewInt(int64(15) * Gwei)
-	gasLimit := big.NewInt(int64(100000))
-
 	/*
-		transactor, _ := bind.NewKeyedTransactorWithChainID(
-			privateKey,
-			chainID,
-		)
-		transactor.GasPrice = big.NewInt(gasPrice)
-		transactor.GasLimit = uint64(gasLimit)
-		transactor.Nonce = big.NewInt(int64(nonce))
+		Gwei := int64(1000000000)
+		gasPrice := big.NewInt(int64(15) * Gwei)
+		gasLimit := big.NewInt(int64(100000))
+
+			transactor, _ := bind.NewKeyedTransactorWithChainID(
+				privateKey,
+				chainID,
+			)
+			transactor.GasPrice = big.NewInt(gasPrice)
+			transactor.GasLimit = uint64(gasLimit)
+			transactor.Nonce = big.NewInt(int64(nonce))
 	*/
 
 	///////////////////////////////////////////////
 	///////////////////////////////////////////////
 	// send ether
-	value := big.NewInt(10000000000000000) // 0.01 ether
-	toAddress := common.HexToAddress("0xda8ad06b2a20c6f92641d185c22f0479b00a90f3")
-	data := []byte{}
-	tx := types.NewTransaction(nonce, toAddress, value, gasLimit, gasPrice, data)
-	signedTx, err := types.SignTx(tx, types.NewPanguSigner(chainID), privateKey)
-	if err != nil {
-		log.Printf("Sign tx err: %v", err)
-	} else {
-		log.Printf("Signed tx: %s", signedTx)
+	/*
+		value := big.NewInt(10000000000000000) // 0.01 ether
+		toAddress := common.HexToAddress("0xda8ad06b2a20c6f92641d185c22f0479b00a90f3")
+		data := []byte{}
+		tx := types.NewTransaction(nonce, toAddress, value, gasLimit, gasPrice, data)
+		signedTx, err := types.SignTx(tx, types.NewPanguSigner(chainID), privateKey)
+		if err != nil {
+			log.Printf("Sign tx err: %v", err)
+		} else {
+			log.Printf("Signed tx: %s", signedTx)
+		}
+
+		err = client.SendTransaction(context.Background(), signedTx)
+		if err != nil {
+			log.Printf("Send tx err: %v", err)
+		}*/
+
+	/////////////////////////////////////////////////////////////
+	////////////scan filter
+	vaultYAddr := common.HexToAddress("0xdBF16E1A4510bEa90a015691258FEDB111ddf10E")
+	vaultyContract, err := vaulty.NewVaultY(
+		vaultYAddr,
+		client,
+	)
+
+	last := uint64(10005800)
+	filterOpts := &bind.FilterOpts{
+		Context: context.Background(),
+		Start:   10005600,
+		End:     &last,
 	}
 
-	err = client.SendTransaction(context.Background(), signedTx)
-	if err != nil {
-		log.Printf("Send tx err: %v", err)
+	itrY, err := vaultyContract.FilterTokenBurn(
+		filterOpts,
+		[]common.Address{},
+		[]common.Address{},
+		[]*big.Int{},
+	)
+
+	for itrY.Next() {
+		event := itrY.Event
+		log.Printf(
+			"\n, %d\n, %x\n, %d\n, %x\n, %x\n, %v\n, %v\n, %v\n, %v\n",
+			event.SourceChainid,
+			event.SourceToken,
+			event.MappedChainid,
+			event.MappedToken,
+			event.From,
+			event.Amount,
+			event.Nonce,
+			event.BlockNumber,
+			event.Tip,
+		)
 	}
 }
