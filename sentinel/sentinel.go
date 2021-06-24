@@ -155,38 +155,35 @@ type XdefiContext struct {
 	XeventsYX     *xevents.XEvents
 }
 
-func logX2Y(from, to common.Address, format string, args ...interface{}) {
-	all := append([]interface{}{from.Bytes()[:4], to.Bytes()[:4]}, args...)
-	log.Infof("[Vault X[%x] -> Y[%x]] "+format, all...)
-}
-
-func logY2X(from, to common.Address, format string, args ...interface{}) {
-	all := append([]interface{}{from.Bytes()[:4], to.Bytes()[:4]}, args...)
-	log.Infof("[Vault Y[%x] -> X[%x]] "+format, all...)
-}
-
-func (xdefiContext *XdefiContext) IsDeposit() bool {
-	return xdefiContext.EventType == DEPOSIT
+func logX2Y(name string, from, to common.Address, format string, args ...interface{}) {
+	all := []interface{}{name, from.Bytes()[:3], to.Bytes()[:3]}
+	all = append(all, args...)
+	log.Infof(" %s %x -> %x "+format, all...)
 }
 
 func (xdefiContext *XdefiContext) LogFunc() func(format string, args ...interface{}) {
 	var fromAddr common.Address
 	var toAddr common.Address
+	var name string
 	if xdefiContext.IsDeposit() {
+		name = "X -> Y"
 		fromAddr = xdefiContext.Config.VaultXAddr
 		toAddr = xdefiContext.Config.VaultYAddr
-		ret := func(format string, args ...interface{}) {
-			logX2Y(fromAddr, toAddr, format, args)
-		}
-		return ret
+
 	} else {
 		fromAddr = xdefiContext.Config.VaultYAddr
 		toAddr = xdefiContext.Config.VaultXAddr
-		ret := func(format string, args ...interface{}) {
-			logX2Y(fromAddr, toAddr, format, args)
-		}
-		return ret
+		name = "Y -> X"
 	}
+
+	ret := func(format string, args ...interface{}) {
+		logX2Y(name, fromAddr, toAddr, format, args...)
+	}
+	return ret
+}
+
+func (xdefiContext *XdefiContext) IsDeposit() bool {
+	return xdefiContext.EventType == DEPOSIT
 }
 
 func (xdefiContext *XdefiContext) Xevents() *xevents.XEvents {
@@ -632,17 +629,19 @@ func (sentinel *Sentinel) scanVaultEvents(
 			log.Errorf(
 				"[scanVaultEvents]----------------- sentinel: unable to get current block number from chain: %v ---------------", err)
 		}
+		currentBlock = currentBlock - BlockDelay
+		if currentBlock < 20 {
+			return nil
+		}
+
 		if lastBlock > currentBlock {
 			return nil
 		}
 
 		// filter events from vaultx, [start, end] are inclusive
 		endBlock := lastBlock + ScanStep - 1
-		if endBlock > currentBlock-BlockDelay {
-			endBlock = currentBlock - BlockDelay
-		}
-		if endBlock < lastBlock {
-			endBlock = lastBlock + 1
+		if endBlock > currentBlock {
+			endBlock = currentBlock
 		}
 
 		filterOpts := &bind.FilterOpts{
@@ -800,7 +799,7 @@ func (sentinel *Sentinel) scanVaultEvents(
 			}
 		}
 
-		lastBlock += ScanStep
+		lastBlock = endBlock + 1
 	}
 }
 
