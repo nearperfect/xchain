@@ -833,7 +833,7 @@ func (sentinel *Sentinel) scanVaultEvents(
 			}
 		}
 
-		lastBlock += ScanStep
+		lastBlock = endBlock
 	}
 }
 
@@ -1039,7 +1039,7 @@ func (sentinel *Sentinel) watchVault(xdefiContext *XdefiContext) {
 				sentinel.LogRpcStat("vault", "storeCounter")
 				if err == nil {
 					logFunc(
-						"[  In WatchVault  ]\t Before vault watermark commit, store counter %d, prev %d, batch size: %d, omitted: %d, commit %d, errors: %d",
+						"[  In WatchVault  ]\t Before MOVE vault watermark, store counter %d, prev %d, batch size: %d, omitted: %d, commit %d, errors: %d",
 						newStoreCounter,
 						batch.StoreCounter,
 						len(batch.Batch),
