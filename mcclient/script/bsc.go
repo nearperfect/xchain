@@ -118,7 +118,8 @@ func main() {
 	for itrY.Next() {
 		event := itrY.Event
 		log.Printf(
-			"%v, %v, %v, %v, %v, %v, %v, %v, %v",
+			"\n, %d\n, %x\n, %d\n, %x\n, %x\n, %v\n, %v\n, %v\n, %v\n",
+
 			event.SourceChainid,
 			event.SourceToken,
 			event.MappedChainid,

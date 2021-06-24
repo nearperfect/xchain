@@ -663,17 +663,19 @@ func (sentinel *Sentinel) scanVaultEvents(
 			log.Errorf(
 				"[scanVaultEvents]\t  sentinel: unable to get current block number from chain: %v", err)
 		}
+		currentBlock = currentBlock - BlockDelay
+		if currentBlock < 20 {
+			return nil
+		}
+
 		if lastBlock > currentBlock {
 			return nil
 		}
 
 		// filter events from vaultx, [start, end] are inclusive
 		endBlock := lastBlock + ScanStep - 1
-		if endBlock > currentBlock-BlockDelay {
-			endBlock = currentBlock - BlockDelay
-		}
-		if endBlock < lastBlock {
-			endBlock = lastBlock + 1
+		if endBlock > currentBlock {
+			endBlock = currentBlock
 		}
 
 		filterOpts := &bind.FilterOpts{
@@ -833,7 +835,7 @@ func (sentinel *Sentinel) scanVaultEvents(
 			}
 		}
 
-		lastBlock = endBlock
+		lastBlock = endBlock + 1
 	}
 }
 
