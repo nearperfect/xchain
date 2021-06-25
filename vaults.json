@@ -1,1 +1,30 @@
-{"vaults":[{"vaultx":{"id":95125,"rpc":"http://172.21.0.11:8545","prefix":"mc","address":"0xABE1A1A941C9666ac221B041aC1cFE6167e1F1D0"},"vaulty":{"id":95125,"rpc":"http://172.21.0.11:8545","prefix":"mc","address":"0xcCa8BAA2d1E83A38bdbcF52a9e5BbB530f50493A"},"tokenmappings":[{"sourcechainid":95125,"sourcetoken":"0x350e47237eb2515b3b30c2f232268b998e392409","mappedchainid":95125,"mappedtoken":"0x8553ce822a9072b5ff0992da9a61d5ce54a1f5df"}]}]}
+{
+  "vaults": [
+    {
+      "vaultx": {
+        "id": 95125,
+        "rpc": "http://172.21.0.11:8545",
+        "ws": "ws://172.21.0.11:8546",
+        "prefix": "mc",
+        "address": "0xABE1A1A941C9666ac221B041aC1cFE6167e1F1D0",
+        "gasprice": 20
+      },
+      "vaulty": {
+        "id": 95125,
+        "rpc": "http://172.21.0.11:8545",
+        "ws": "ws://172.21.0.11:8546",
+        "prefix": "mc",
+        "address": "0xcCa8BAA2d1E83A38bdbcF52a9e5BbB530f50493A",
+        "gasprice": 20
+      },
+      "tokenmappings": [
+        {
+          "sourcechainid": 95125,
+          "sourcetoken": "0x350e47237eb2515b3b30c2f232268b998e392409",
+          "mappedchainid": 95125,
+          "mappedtoken": "0x8553ce822a9072b5ff0992da9a61d5ce54a1f5df"
+        }
+      ]
+    }
+  ]
+}

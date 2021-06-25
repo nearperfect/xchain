@@ -42,9 +42,10 @@ type TokenMapping struct {
 type VaultConfig struct {
 	ChainId         uint64 `json:"id"  gencodec:"required"`
 	ChainRPC        string `json:"rpc"  gencodec:"required"`
+	ChainWS         string `json:"ws"  gencodec:"required"`
 	ChainFuncPrefix string `json:"prefix"  gencodec:"required"`
 	VaultAddress    string `json:"address"  gencodec:"required"`
-	GasPrice        uint64 `json:"gasprice"`
+	GasPrice        uint64 `json:"gasprice" gencodec:"required"`
 }
 
 type VaultPairConfig struct {

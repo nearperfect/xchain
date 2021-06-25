@@ -48,6 +48,7 @@ const (
 	defaultDialTimeout   = 10 * time.Second // used when dialing if the context has no deadline
 	defaultWriteTimeout  = 10 * time.Second // used for calls if the context has no deadline
 	subscribeTimeout     = 5 * time.Second  // overall timeout mc_subscribe, rpc_modules calls
+	DefaultWSFuncPrefix  = "mc"
 )
 
 const (
@@ -110,6 +111,7 @@ type Client struct {
 	idCounter   uint32
 	connectFunc func(ctx context.Context) (net.Conn, error)
 	isHTTP      bool
+	prefix      string
 
 	// writeConn is only safe to access outside dispatch, with the
 	// write lock held. The write lock is taken by sending on
@@ -190,6 +192,7 @@ func newClient(initctx context.Context, connectFunc func(context.Context) (net.C
 		writeConn:   conn,
 		isHTTP:      isHTTP,
 		connectFunc: connectFunc,
+		prefix:      DefaultWSFuncPrefix,
 		close:       make(chan struct{}),
 		didQuit:     make(chan struct{}),
 		reconnected: make(chan net.Conn),
@@ -209,6 +212,10 @@ func newClient(initctx context.Context, connectFunc func(context.Context) (net.C
 func (c *Client) nextID() json.RawMessage {
 	id := atomic.AddUint32(&c.idCounter, 1)
 	return []byte(strconv.FormatUint(uint64(id), 10))
+}
+
+func (c *Client) SetFuncPrefix(prefix string) {
+	c.prefix = prefix
 }
 
 // SupportedModules calls the rpc_modules method, retrieving the list of
@@ -280,23 +287,23 @@ func (c *Client) CallContext(ctx context.Context, result interface{}, method str
 	default:
 		err := json.Unmarshal(resp.Result, &result)
 		if fmt.Sprintf("%s", err) == "missing required field 'TxData' for Log" {
-			targetLogs := *result.(*[]types.Log)
+			resultLogs := *result.(*[]types.Log)
 			var resultNew []types.LogNew
 			errNew := json.Unmarshal(resp.Result, &resultNew)
 			if errNew != nil {
 				return errNew
 			} else {
 				count := 0
-				for index, _ := range targetLogs {
-					targetLogs[index].Address = resultNew[index].Address
-					targetLogs[index].Topics = resultNew[index].Topics
-					targetLogs[index].Data = resultNew[index].Data
-					targetLogs[index].BlockNumber = resultNew[index].BlockNumber
-					targetLogs[index].TxHash = resultNew[index].TxHash
-					targetLogs[index].TxIndex = resultNew[index].TxIndex
-					targetLogs[index].BlockHash = resultNew[index].BlockHash
-					targetLogs[index].Index = resultNew[index].Index
-					targetLogs[index].Removed = resultNew[index].Removed
+				for index, _ := range resultLogs {
+					resultLogs[index].Address = resultNew[index].Address
+					resultLogs[index].Topics = resultNew[index].Topics
+					resultLogs[index].Data = resultNew[index].Data
+					resultLogs[index].BlockNumber = resultNew[index].BlockNumber
+					resultLogs[index].TxHash = resultNew[index].TxHash
+					resultLogs[index].TxIndex = resultNew[index].TxIndex
+					resultLogs[index].BlockHash = resultNew[index].BlockHash
+					resultLogs[index].Index = resultNew[index].Index
+					resultLogs[index].Removed = resultNew[index].Removed
 					count += 1
 				}
 
@@ -312,7 +319,7 @@ func (c *Client) CallContext(ctx context.Context, result interface{}, method str
 					l.BlockHash = lNew.BlockHash
 					l.Index = lNew.Index
 					l.Removed = lNew.Removed
-					targetLogs = append(targetLogs, l)
+					resultLogs = append(resultLogs, l)
 				}
 
 				return nil
@@ -467,14 +474,14 @@ func (c *Client) McSubscribe(ctx context.Context, channel interface{}, args ...i
 		return nil, ErrNotificationsUnsupported
 	}
 
-	msg, err := c.newMessage("mc"+subscribeMethodSuffix, args...)
+	msg, err := c.newMessage(c.prefix+subscribeMethodSuffix, args...)
 	if err != nil {
 		return nil, err
 	}
 	op := &requestOp{
 		ids:  []json.RawMessage{msg.ID},
 		resp: make(chan *jsonrpcMessage),
-		sub:  newClientSubscription(c, "mc", chanVal),
+		sub:  newClientSubscription(c, c.prefix, chanVal),
 	}
 
 	// Send the subscription request.
