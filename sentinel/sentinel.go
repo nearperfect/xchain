@@ -1316,7 +1316,7 @@ func (sentinel *Sentinel) start() {
 			vaulty.ChainRPC,
 			common.HexToAddress(vaulty.VaultAddress),
 		)
-		xdefiContextXY.EventType = BURN
+		xdefiContextYX.EventType = BURN
 		go sentinel.watchVault(xdefiContextYX)
 		for _, tokenMapping := range vaultPairConfig.TokenMappings {
 			go sentinel.doForward(xdefiContextYX, tokenMapping)
