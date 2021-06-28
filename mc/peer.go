@@ -31,9 +31,9 @@ import (
 	pb "github.com/MOACChain/MoacLib/proto"
 	"github.com/MOACChain/MoacLib/rlp"
 	"github.com/MOACChain/MoacLib/types"
-	"github.com/MOACChain/xchain/core"
 	"github.com/MOACChain/xchain/p2p"
 	"github.com/MOACChain/xchain/p2p/discover"
+	"github.com/MOACChain/xchain/sentinel"
 )
 
 var (
@@ -82,17 +82,17 @@ type Peer struct {
 	td                       *big.Int
 	lock                     sync.RWMutex
 	subnet                   string
-	knownTxs                 *set.Set                     // Set of transaction hashes known to be known by this Peer
-	knownBlocks              *set.Set                     // Set of block hashes known to be known by this Peer
-	knownMsgs                *set.Set                     // Set of msg request ids known to be sent to the Peer
-	knownVaultEventWithSigs  *set.Set                     // Set of vault event hashes known to be known by this Peer
-	queuedTxs                chan types.Transactions      // Queue of transactions to broadcast to the peer
-	queuedVaultEventWithSigs chan core.VaultEventWithSigs // Queue of vault events to broadcast to the peer
-	queuedProps              chan *propEvent              // Queue of blocks to broadcast to the peer
-	queuedAnns               chan *types.Block            // Queue of blocks to announce to the peer
-	queuedMsgs               chan *pb.ScsPushMsg          // Queue of scs msgs to broadcast to the peer
-	queuedRes                chan *pb.ScsPushMsg          // Queue of scs Res to broadcast to the peer
-	term                     chan struct{}                // Termination channel to stop the broadcaster
+	knownTxs                 *set.Set                         // Set of transaction hashes known to be known by this Peer
+	knownBlocks              *set.Set                         // Set of block hashes known to be known by this Peer
+	knownMsgs                *set.Set                         // Set of msg request ids known to be sent to the Peer
+	knownVaultEventWithSigs  *set.Set                         // Set of vault event hashes known to be known by this Peer
+	queuedTxs                chan types.Transactions          // Queue of transactions to broadcast to the peer
+	queuedVaultEventWithSigs chan sentinel.VaultEventWithSigs // Queue of vault events to broadcast to the peer
+	queuedProps              chan *propEvent                  // Queue of blocks to broadcast to the peer
+	queuedAnns               chan *types.Block                // Queue of blocks to announce to the peer
+	queuedMsgs               chan *pb.ScsPushMsg              // Queue of scs msgs to broadcast to the peer
+	queuedRes                chan *pb.ScsPushMsg              // Queue of scs Res to broadcast to the peer
+	term                     chan struct{}                    // Termination channel to stop the broadcaster
 }
 
 func newPeer(version int, p *p2p.Peer, rw p2p.MsgReadWriter) *Peer {
@@ -108,7 +108,7 @@ func newPeer(version int, p *p2p.Peer, rw p2p.MsgReadWriter) *Peer {
 		knownMsgs:                set.New(),
 		knownVaultEventWithSigs:  set.New(),
 		queuedTxs:                make(chan types.Transactions, maxQueuedTxs),
-		queuedVaultEventWithSigs: make(chan core.VaultEventWithSigs, maxQueuedVaultEvents),
+		queuedVaultEventWithSigs: make(chan sentinel.VaultEventWithSigs, maxQueuedVaultEvents),
 		queuedProps:              make(chan *propEvent, maxQueuedProps),
 		queuedAnns:               make(chan *types.Block, maxQueuedAnns),
 		queuedMsgs:               make(chan *pb.ScsPushMsg, maxQueuedMsgs),
@@ -248,7 +248,7 @@ func (p *Peer) SendTransactions(txs types.Transactions) error {
 
 // SendVaultEvents sends vault events to the Peer and includes the hashes
 // in its vault events hash set for future reference.
-func (p *Peer) SendVaultEventWithSigs(vaultEventWithSigs core.VaultEventWithSigs) error {
+func (p *Peer) SendVaultEventWithSigs(vaultEventWithSigs sentinel.VaultEventWithSigs) error {
 	for _, vaultEventWithSig := range vaultEventWithSigs {
 		p.knownVaultEventWithSigs.Add(vaultEventWithSig.Hash())
 	}
@@ -272,7 +272,7 @@ func (p *Peer) AsyncSendTransactions(txs types.Transactions) {
 
 // AsyncSendVaultEvents queues list of vault events propagation to a remote
 // peer. If the peer's broadcast queue is full, the event is silently dropped.
-func (p *Peer) AsyncSendVaultEventWithSigs(vaultEventWithSigs core.VaultEventWithSigs) {
+func (p *Peer) AsyncSendVaultEventWithSigs(vaultEventWithSigs sentinel.VaultEventWithSigs) {
 	select {
 	case p.queuedVaultEventWithSigs <- vaultEventWithSigs:
 		for _, vaultEventWithSig := range vaultEventWithSigs {

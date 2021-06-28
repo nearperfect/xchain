@@ -7,7 +7,8 @@
         "ws": "ws://172.21.0.11:8546",
         "prefix": "mc",
         "address": "0xABE1A1A941C9666ac221B041aC1cFE6167e1F1D0",
-        "gasprice": 20
+        "gasprice": 20,
+        "blocktime": 5
       },
       "vaulty": {
         "id": 95125,
@@ -15,7 +16,8 @@
         "ws": "ws://172.21.0.11:8546",
         "prefix": "mc",
         "address": "0xcCa8BAA2d1E83A38bdbcF52a9e5BbB530f50493A",
-        "gasprice": 20
+        "gasprice": 20,
+        "blocktime": 5
       },
       "tokenmappings": [
         {

@@ -33,7 +33,7 @@ type RoleAccessRole struct {
 }
 
 // XEventsABI is the input ABI used to generate the binding from.
-const XEventsABI = "[{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"previousAdminRole\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"newAdminRole\",\"type\":\"bytes32\"}],\"name\":\"RoleAdminChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"}],\"name\":\"RoleGranted\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"}],\"name\":\"RoleRevoked\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"DEFAULT_ADMIN_ROLE\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"member\",\"type\":\"address\"}],\"name\":\"addRoleMember\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"}],\"name\":\"getRoleAdmin\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"index\",\"type\":\"uint256\"}],\"name\":\"getRoleMember\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"}],\"name\":\"getRoleMemberCount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"}],\"name\":\"getRoleMembers\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getRoles\",\"outputs\":[{\"components\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"string\",\"name\":\"describe\",\"type\":\"string\"}],\"internalType\":\"structRoleAccess.Role[]\",\"name\":\"\",\"type\":\"tuple[]\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"grantRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"hasRole\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"initialized\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"mintWatermark\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"member\",\"type\":\"address\"}],\"name\":\"removeRoleMember\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"renounceRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"revokeRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"storeCounter\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"interfaceId\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"vaultEventDone\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"vaultEventWatermark\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"vaultEvents\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"eventData\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"sig\",\"type\":\"bytes\"},{\"internalType\":\"uint256\",\"name\":\"blockNumber\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"vaultStoreCounter\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"vaultWatermark\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"initialize\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"sig\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"vault\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"nonce\",\"type\":\"uint256\"},{\"internalType\":\"bytes32\",\"name\":\"tokenMapping\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"blockNumber\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"eventData\",\"type\":\"bytes\"}],\"name\":\"store\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"vault\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"tokenMapping\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"nonce\",\"type\":\"uint256\"}],\"name\":\"doMint\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"vault\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"blockNumber\",\"type\":\"uint256\"}],\"name\":\"updateVaultWatermark\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"vault\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"tokenMapping\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"nonce\",\"type\":\"uint256\"}],\"name\":\"done\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"n_\",\"type\":\"uint256\"}],\"name\":\"setStoreCounter\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"vault\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"blockNumber\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"storeCounter_\",\"type\":\"uint256\"}],\"name\":\"rescue\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"vault\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"tokenMapping\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"nonce\",\"type\":\"uint256\"}],\"name\":\"rescueVault\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
+const XEventsABI = "[{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"previousAdminRole\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"newAdminRole\",\"type\":\"bytes32\"}],\"name\":\"RoleAdminChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"}],\"name\":\"RoleGranted\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"}],\"name\":\"RoleRevoked\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"DEFAULT_ADMIN_ROLE\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\",\"constant\":true},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"member\",\"type\":\"address\"}],\"name\":\"addRoleMember\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"}],\"name\":\"getRoleAdmin\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\",\"constant\":true},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"index\",\"type\":\"uint256\"}],\"name\":\"getRoleMember\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\",\"constant\":true},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"}],\"name\":\"getRoleMemberCount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\",\"constant\":true},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"}],\"name\":\"getRoleMembers\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"}],\"stateMutability\":\"view\",\"type\":\"function\",\"constant\":true},{\"inputs\":[],\"name\":\"getRoles\",\"outputs\":[{\"components\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"string\",\"name\":\"describe\",\"type\":\"string\"}],\"internalType\":\"structRoleAccess.Role[]\",\"name\":\"\",\"type\":\"tuple[]\"}],\"stateMutability\":\"pure\",\"type\":\"function\",\"constant\":true},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"grantRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"hasRole\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\",\"constant\":true},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"mintWatermark\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\",\"constant\":true},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"member\",\"type\":\"address\"}],\"name\":\"removeRoleMember\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"renounceRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"revokeRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"interfaceId\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\",\"constant\":true},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"tokenMappingWatermark\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\",\"constant\":true},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"vaultEventDone\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\",\"constant\":true},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"vaultEvents\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"eventData\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"sig\",\"type\":\"bytes\"},{\"internalType\":\"uint256\",\"name\":\"blockNumber\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\",\"constant\":true},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"vaultWatermark\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\",\"constant\":true},{\"inputs\":[],\"name\":\"initialize\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"sig\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"vault\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"nonce\",\"type\":\"uint256\"},{\"internalType\":\"bytes32\",\"name\":\"tokenMapping\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"blockNumber\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"eventData\",\"type\":\"bytes\"}],\"name\":\"RecordVaultEvent\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"vault\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"blockNumber\",\"type\":\"uint256\"}],\"name\":\"updateVaultWatermark\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"vault\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"tokenMapping\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"nonce\",\"type\":\"uint256\"}],\"name\":\"done\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"vault\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"blockNumber\",\"type\":\"uint256\"}],\"name\":\"rescueVault\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"vault\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"tokenMapping\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"nonce\",\"type\":\"uint256\"}],\"name\":\"rescueTokenMapping\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
 
 // XEvents is an auto generated Go binding around an Ethereum contract.
 type XEvents struct {
@@ -394,37 +394,6 @@ func (_XEvents *XEventsCallerSession) HasRole(role [32]byte, account common.Addr
 	return _XEvents.Contract.HasRole(&_XEvents.CallOpts, role, account)
 }
 
-// Initialized is a free data retrieval call binding the contract method 0x158ef93e.
-//
-// Solidity: function initialized() view returns(bool)
-func (_XEvents *XEventsCaller) Initialized(opts *bind.CallOpts) (bool, error) {
-	var out []interface{}
-	err := _XEvents.contract.Call(opts, &out, "initialized")
-
-	if err != nil {
-		return *new(bool), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
-
-	return out0, err
-
-}
-
-// Initialized is a free data retrieval call binding the contract method 0x158ef93e.
-//
-// Solidity: function initialized() view returns(bool)
-func (_XEvents *XEventsSession) Initialized() (bool, error) {
-	return _XEvents.Contract.Initialized(&_XEvents.CallOpts)
-}
-
-// Initialized is a free data retrieval call binding the contract method 0x158ef93e.
-//
-// Solidity: function initialized() view returns(bool)
-func (_XEvents *XEventsCallerSession) Initialized() (bool, error) {
-	return _XEvents.Contract.Initialized(&_XEvents.CallOpts)
-}
-
 // MintWatermark is a free data retrieval call binding the contract method 0xbb4f797f.
 //
 // Solidity: function mintWatermark(address , bytes32 ) view returns(uint256)
@@ -454,37 +423,6 @@ func (_XEvents *XEventsSession) MintWatermark(arg0 common.Address, arg1 [32]byte
 // Solidity: function mintWatermark(address , bytes32 ) view returns(uint256)
 func (_XEvents *XEventsCallerSession) MintWatermark(arg0 common.Address, arg1 [32]byte) (*big.Int, error) {
 	return _XEvents.Contract.MintWatermark(&_XEvents.CallOpts, arg0, arg1)
-}
-
-// StoreCounter is a free data retrieval call binding the contract method 0xb9ca868d.
-//
-// Solidity: function storeCounter() view returns(uint256)
-func (_XEvents *XEventsCaller) StoreCounter(opts *bind.CallOpts) (*big.Int, error) {
-	var out []interface{}
-	err := _XEvents.contract.Call(opts, &out, "storeCounter")
-
-	if err != nil {
-		return *new(*big.Int), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
-
-	return out0, err
-
-}
-
-// StoreCounter is a free data retrieval call binding the contract method 0xb9ca868d.
-//
-// Solidity: function storeCounter() view returns(uint256)
-func (_XEvents *XEventsSession) StoreCounter() (*big.Int, error) {
-	return _XEvents.Contract.StoreCounter(&_XEvents.CallOpts)
-}
-
-// StoreCounter is a free data retrieval call binding the contract method 0xb9ca868d.
-//
-// Solidity: function storeCounter() view returns(uint256)
-func (_XEvents *XEventsCallerSession) StoreCounter() (*big.Int, error) {
-	return _XEvents.Contract.StoreCounter(&_XEvents.CallOpts)
 }
 
 // SupportsInterface is a free data retrieval call binding the contract method 0x01ffc9a7.
@@ -518,6 +456,37 @@ func (_XEvents *XEventsCallerSession) SupportsInterface(interfaceId [4]byte) (bo
 	return _XEvents.Contract.SupportsInterface(&_XEvents.CallOpts, interfaceId)
 }
 
+// TokenMappingWatermark is a free data retrieval call binding the contract method 0x6366e0ab.
+//
+// Solidity: function tokenMappingWatermark(address , bytes32 ) view returns(uint256)
+func (_XEvents *XEventsCaller) TokenMappingWatermark(opts *bind.CallOpts, arg0 common.Address, arg1 [32]byte) (*big.Int, error) {
+	var out []interface{}
+	err := _XEvents.contract.Call(opts, &out, "tokenMappingWatermark", arg0, arg1)
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
+}
+
+// TokenMappingWatermark is a free data retrieval call binding the contract method 0x6366e0ab.
+//
+// Solidity: function tokenMappingWatermark(address , bytes32 ) view returns(uint256)
+func (_XEvents *XEventsSession) TokenMappingWatermark(arg0 common.Address, arg1 [32]byte) (*big.Int, error) {
+	return _XEvents.Contract.TokenMappingWatermark(&_XEvents.CallOpts, arg0, arg1)
+}
+
+// TokenMappingWatermark is a free data retrieval call binding the contract method 0x6366e0ab.
+//
+// Solidity: function tokenMappingWatermark(address , bytes32 ) view returns(uint256)
+func (_XEvents *XEventsCallerSession) TokenMappingWatermark(arg0 common.Address, arg1 [32]byte) (*big.Int, error) {
+	return _XEvents.Contract.TokenMappingWatermark(&_XEvents.CallOpts, arg0, arg1)
+}
+
 // VaultEventDone is a free data retrieval call binding the contract method 0xad9ef616.
 //
 // Solidity: function vaultEventDone(address , bytes32 ) view returns(uint256)
@@ -547,37 +516,6 @@ func (_XEvents *XEventsSession) VaultEventDone(arg0 common.Address, arg1 [32]byt
 // Solidity: function vaultEventDone(address , bytes32 ) view returns(uint256)
 func (_XEvents *XEventsCallerSession) VaultEventDone(arg0 common.Address, arg1 [32]byte) (*big.Int, error) {
 	return _XEvents.Contract.VaultEventDone(&_XEvents.CallOpts, arg0, arg1)
-}
-
-// VaultEventWatermark is a free data retrieval call binding the contract method 0xa5067868.
-//
-// Solidity: function vaultEventWatermark(address , bytes32 ) view returns(uint256)
-func (_XEvents *XEventsCaller) VaultEventWatermark(opts *bind.CallOpts, arg0 common.Address, arg1 [32]byte) (*big.Int, error) {
-	var out []interface{}
-	err := _XEvents.contract.Call(opts, &out, "vaultEventWatermark", arg0, arg1)
-
-	if err != nil {
-		return *new(*big.Int), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
-
-	return out0, err
-
-}
-
-// VaultEventWatermark is a free data retrieval call binding the contract method 0xa5067868.
-//
-// Solidity: function vaultEventWatermark(address , bytes32 ) view returns(uint256)
-func (_XEvents *XEventsSession) VaultEventWatermark(arg0 common.Address, arg1 [32]byte) (*big.Int, error) {
-	return _XEvents.Contract.VaultEventWatermark(&_XEvents.CallOpts, arg0, arg1)
-}
-
-// VaultEventWatermark is a free data retrieval call binding the contract method 0xa5067868.
-//
-// Solidity: function vaultEventWatermark(address , bytes32 ) view returns(uint256)
-func (_XEvents *XEventsCallerSession) VaultEventWatermark(arg0 common.Address, arg1 [32]byte) (*big.Int, error) {
-	return _XEvents.Contract.VaultEventWatermark(&_XEvents.CallOpts, arg0, arg1)
 }
 
 // VaultEvents is a free data retrieval call binding the contract method 0x68741d5e.
@@ -630,37 +568,6 @@ func (_XEvents *XEventsCallerSession) VaultEvents(arg0 common.Address, arg1 [32]
 	return _XEvents.Contract.VaultEvents(&_XEvents.CallOpts, arg0, arg1, arg2)
 }
 
-// VaultStoreCounter is a free data retrieval call binding the contract method 0x1e2cb95f.
-//
-// Solidity: function vaultStoreCounter(address , uint256 ) view returns(uint256)
-func (_XEvents *XEventsCaller) VaultStoreCounter(opts *bind.CallOpts, arg0 common.Address, arg1 *big.Int) (*big.Int, error) {
-	var out []interface{}
-	err := _XEvents.contract.Call(opts, &out, "vaultStoreCounter", arg0, arg1)
-
-	if err != nil {
-		return *new(*big.Int), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
-
-	return out0, err
-
-}
-
-// VaultStoreCounter is a free data retrieval call binding the contract method 0x1e2cb95f.
-//
-// Solidity: function vaultStoreCounter(address , uint256 ) view returns(uint256)
-func (_XEvents *XEventsSession) VaultStoreCounter(arg0 common.Address, arg1 *big.Int) (*big.Int, error) {
-	return _XEvents.Contract.VaultStoreCounter(&_XEvents.CallOpts, arg0, arg1)
-}
-
-// VaultStoreCounter is a free data retrieval call binding the contract method 0x1e2cb95f.
-//
-// Solidity: function vaultStoreCounter(address , uint256 ) view returns(uint256)
-func (_XEvents *XEventsCallerSession) VaultStoreCounter(arg0 common.Address, arg1 *big.Int) (*big.Int, error) {
-	return _XEvents.Contract.VaultStoreCounter(&_XEvents.CallOpts, arg0, arg1)
-}
-
 // VaultWatermark is a free data retrieval call binding the contract method 0x5b65b990.
 //
 // Solidity: function vaultWatermark(address ) view returns(uint256)
@@ -692,6 +599,27 @@ func (_XEvents *XEventsCallerSession) VaultWatermark(arg0 common.Address) (*big.
 	return _XEvents.Contract.VaultWatermark(&_XEvents.CallOpts, arg0)
 }
 
+// RecordVaultEvent is a paid mutator transaction binding the contract method 0x0a632c10.
+//
+// Solidity: function RecordVaultEvent(bytes sig, address vault, uint256 nonce, bytes32 tokenMapping, uint256 blockNumber, bytes eventData) returns()
+func (_XEvents *XEventsTransactor) RecordVaultEvent(opts *bind.TransactOpts, sig []byte, vault common.Address, nonce *big.Int, tokenMapping [32]byte, blockNumber *big.Int, eventData []byte) (*types.Transaction, error) {
+	return _XEvents.contract.Transact(opts, "RecordVaultEvent", sig, vault, nonce, tokenMapping, blockNumber, eventData)
+}
+
+// RecordVaultEvent is a paid mutator transaction binding the contract method 0x0a632c10.
+//
+// Solidity: function RecordVaultEvent(bytes sig, address vault, uint256 nonce, bytes32 tokenMapping, uint256 blockNumber, bytes eventData) returns()
+func (_XEvents *XEventsSession) RecordVaultEvent(sig []byte, vault common.Address, nonce *big.Int, tokenMapping [32]byte, blockNumber *big.Int, eventData []byte) (*types.Transaction, error) {
+	return _XEvents.Contract.RecordVaultEvent(&_XEvents.TransactOpts, sig, vault, nonce, tokenMapping, blockNumber, eventData)
+}
+
+// RecordVaultEvent is a paid mutator transaction binding the contract method 0x0a632c10.
+//
+// Solidity: function RecordVaultEvent(bytes sig, address vault, uint256 nonce, bytes32 tokenMapping, uint256 blockNumber, bytes eventData) returns()
+func (_XEvents *XEventsTransactorSession) RecordVaultEvent(sig []byte, vault common.Address, nonce *big.Int, tokenMapping [32]byte, blockNumber *big.Int, eventData []byte) (*types.Transaction, error) {
+	return _XEvents.Contract.RecordVaultEvent(&_XEvents.TransactOpts, sig, vault, nonce, tokenMapping, blockNumber, eventData)
+}
+
 // AddRoleMember is a paid mutator transaction binding the contract method 0x1b65471f.
 //
 // Solidity: function addRoleMember(bytes32 role, address member) returns(bool)
@@ -711,27 +639,6 @@ func (_XEvents *XEventsSession) AddRoleMember(role [32]byte, member common.Addre
 // Solidity: function addRoleMember(bytes32 role, address member) returns(bool)
 func (_XEvents *XEventsTransactorSession) AddRoleMember(role [32]byte, member common.Address) (*types.Transaction, error) {
 	return _XEvents.Contract.AddRoleMember(&_XEvents.TransactOpts, role, member)
-}
-
-// DoMint is a paid mutator transaction binding the contract method 0xb5562cbd.
-//
-// Solidity: function doMint(address vault, bytes32 tokenMapping, uint256 nonce) returns()
-func (_XEvents *XEventsTransactor) DoMint(opts *bind.TransactOpts, vault common.Address, tokenMapping [32]byte, nonce *big.Int) (*types.Transaction, error) {
-	return _XEvents.contract.Transact(opts, "doMint", vault, tokenMapping, nonce)
-}
-
-// DoMint is a paid mutator transaction binding the contract method 0xb5562cbd.
-//
-// Solidity: function doMint(address vault, bytes32 tokenMapping, uint256 nonce) returns()
-func (_XEvents *XEventsSession) DoMint(vault common.Address, tokenMapping [32]byte, nonce *big.Int) (*types.Transaction, error) {
-	return _XEvents.Contract.DoMint(&_XEvents.TransactOpts, vault, tokenMapping, nonce)
-}
-
-// DoMint is a paid mutator transaction binding the contract method 0xb5562cbd.
-//
-// Solidity: function doMint(address vault, bytes32 tokenMapping, uint256 nonce) returns()
-func (_XEvents *XEventsTransactorSession) DoMint(vault common.Address, tokenMapping [32]byte, nonce *big.Int) (*types.Transaction, error) {
-	return _XEvents.Contract.DoMint(&_XEvents.TransactOpts, vault, tokenMapping, nonce)
 }
 
 // Done is a paid mutator transaction binding the contract method 0x0cdec404.
@@ -839,46 +746,46 @@ func (_XEvents *XEventsTransactorSession) RenounceRole(role [32]byte, account co
 	return _XEvents.Contract.RenounceRole(&_XEvents.TransactOpts, role, account)
 }
 
-// Rescue is a paid mutator transaction binding the contract method 0x18c023ae.
+// RescueTokenMapping is a paid mutator transaction binding the contract method 0x4f299cd5.
 //
-// Solidity: function rescue(address vault, uint256 blockNumber, uint256 storeCounter_) returns()
-func (_XEvents *XEventsTransactor) Rescue(opts *bind.TransactOpts, vault common.Address, blockNumber *big.Int, storeCounter_ *big.Int) (*types.Transaction, error) {
-	return _XEvents.contract.Transact(opts, "rescue", vault, blockNumber, storeCounter_)
+// Solidity: function rescueTokenMapping(address vault, bytes32 tokenMapping, uint256 nonce) returns()
+func (_XEvents *XEventsTransactor) RescueTokenMapping(opts *bind.TransactOpts, vault common.Address, tokenMapping [32]byte, nonce *big.Int) (*types.Transaction, error) {
+	return _XEvents.contract.Transact(opts, "rescueTokenMapping", vault, tokenMapping, nonce)
 }
 
-// Rescue is a paid mutator transaction binding the contract method 0x18c023ae.
+// RescueTokenMapping is a paid mutator transaction binding the contract method 0x4f299cd5.
 //
-// Solidity: function rescue(address vault, uint256 blockNumber, uint256 storeCounter_) returns()
-func (_XEvents *XEventsSession) Rescue(vault common.Address, blockNumber *big.Int, storeCounter_ *big.Int) (*types.Transaction, error) {
-	return _XEvents.Contract.Rescue(&_XEvents.TransactOpts, vault, blockNumber, storeCounter_)
+// Solidity: function rescueTokenMapping(address vault, bytes32 tokenMapping, uint256 nonce) returns()
+func (_XEvents *XEventsSession) RescueTokenMapping(vault common.Address, tokenMapping [32]byte, nonce *big.Int) (*types.Transaction, error) {
+	return _XEvents.Contract.RescueTokenMapping(&_XEvents.TransactOpts, vault, tokenMapping, nonce)
 }
 
-// Rescue is a paid mutator transaction binding the contract method 0x18c023ae.
+// RescueTokenMapping is a paid mutator transaction binding the contract method 0x4f299cd5.
 //
-// Solidity: function rescue(address vault, uint256 blockNumber, uint256 storeCounter_) returns()
-func (_XEvents *XEventsTransactorSession) Rescue(vault common.Address, blockNumber *big.Int, storeCounter_ *big.Int) (*types.Transaction, error) {
-	return _XEvents.Contract.Rescue(&_XEvents.TransactOpts, vault, blockNumber, storeCounter_)
+// Solidity: function rescueTokenMapping(address vault, bytes32 tokenMapping, uint256 nonce) returns()
+func (_XEvents *XEventsTransactorSession) RescueTokenMapping(vault common.Address, tokenMapping [32]byte, nonce *big.Int) (*types.Transaction, error) {
+	return _XEvents.Contract.RescueTokenMapping(&_XEvents.TransactOpts, vault, tokenMapping, nonce)
 }
 
-// RescueVault is a paid mutator transaction binding the contract method 0x63e19513.
+// RescueVault is a paid mutator transaction binding the contract method 0xaf81ce2d.
 //
-// Solidity: function rescueVault(address vault, bytes32 tokenMapping, uint256 nonce) returns()
-func (_XEvents *XEventsTransactor) RescueVault(opts *bind.TransactOpts, vault common.Address, tokenMapping [32]byte, nonce *big.Int) (*types.Transaction, error) {
-	return _XEvents.contract.Transact(opts, "rescueVault", vault, tokenMapping, nonce)
+// Solidity: function rescueVault(address vault, uint256 blockNumber) returns()
+func (_XEvents *XEventsTransactor) RescueVault(opts *bind.TransactOpts, vault common.Address, blockNumber *big.Int) (*types.Transaction, error) {
+	return _XEvents.contract.Transact(opts, "rescueVault", vault, blockNumber)
 }
 
-// RescueVault is a paid mutator transaction binding the contract method 0x63e19513.
+// RescueVault is a paid mutator transaction binding the contract method 0xaf81ce2d.
 //
-// Solidity: function rescueVault(address vault, bytes32 tokenMapping, uint256 nonce) returns()
-func (_XEvents *XEventsSession) RescueVault(vault common.Address, tokenMapping [32]byte, nonce *big.Int) (*types.Transaction, error) {
-	return _XEvents.Contract.RescueVault(&_XEvents.TransactOpts, vault, tokenMapping, nonce)
+// Solidity: function rescueVault(address vault, uint256 blockNumber) returns()
+func (_XEvents *XEventsSession) RescueVault(vault common.Address, blockNumber *big.Int) (*types.Transaction, error) {
+	return _XEvents.Contract.RescueVault(&_XEvents.TransactOpts, vault, blockNumber)
 }
 
-// RescueVault is a paid mutator transaction binding the contract method 0x63e19513.
+// RescueVault is a paid mutator transaction binding the contract method 0xaf81ce2d.
 //
-// Solidity: function rescueVault(address vault, bytes32 tokenMapping, uint256 nonce) returns()
-func (_XEvents *XEventsTransactorSession) RescueVault(vault common.Address, tokenMapping [32]byte, nonce *big.Int) (*types.Transaction, error) {
-	return _XEvents.Contract.RescueVault(&_XEvents.TransactOpts, vault, tokenMapping, nonce)
+// Solidity: function rescueVault(address vault, uint256 blockNumber) returns()
+func (_XEvents *XEventsTransactorSession) RescueVault(vault common.Address, blockNumber *big.Int) (*types.Transaction, error) {
+	return _XEvents.Contract.RescueVault(&_XEvents.TransactOpts, vault, blockNumber)
 }
 
 // RevokeRole is a paid mutator transaction binding the contract method 0xd547741f.
@@ -900,48 +807,6 @@ func (_XEvents *XEventsSession) RevokeRole(role [32]byte, account common.Address
 // Solidity: function revokeRole(bytes32 role, address account) returns()
 func (_XEvents *XEventsTransactorSession) RevokeRole(role [32]byte, account common.Address) (*types.Transaction, error) {
 	return _XEvents.Contract.RevokeRole(&_XEvents.TransactOpts, role, account)
-}
-
-// SetStoreCounter is a paid mutator transaction binding the contract method 0x284a26a0.
-//
-// Solidity: function setStoreCounter(uint256 n_) returns()
-func (_XEvents *XEventsTransactor) SetStoreCounter(opts *bind.TransactOpts, n_ *big.Int) (*types.Transaction, error) {
-	return _XEvents.contract.Transact(opts, "setStoreCounter", n_)
-}
-
-// SetStoreCounter is a paid mutator transaction binding the contract method 0x284a26a0.
-//
-// Solidity: function setStoreCounter(uint256 n_) returns()
-func (_XEvents *XEventsSession) SetStoreCounter(n_ *big.Int) (*types.Transaction, error) {
-	return _XEvents.Contract.SetStoreCounter(&_XEvents.TransactOpts, n_)
-}
-
-// SetStoreCounter is a paid mutator transaction binding the contract method 0x284a26a0.
-//
-// Solidity: function setStoreCounter(uint256 n_) returns()
-func (_XEvents *XEventsTransactorSession) SetStoreCounter(n_ *big.Int) (*types.Transaction, error) {
-	return _XEvents.Contract.SetStoreCounter(&_XEvents.TransactOpts, n_)
-}
-
-// Store is a paid mutator transaction binding the contract method 0xfebb7ca1.
-//
-// Solidity: function store(bytes sig, address vault, uint256 nonce, bytes32 tokenMapping, uint256 blockNumber, bytes eventData) returns()
-func (_XEvents *XEventsTransactor) Store(opts *bind.TransactOpts, sig []byte, vault common.Address, nonce *big.Int, tokenMapping [32]byte, blockNumber *big.Int, eventData []byte) (*types.Transaction, error) {
-	return _XEvents.contract.Transact(opts, "store", sig, vault, nonce, tokenMapping, blockNumber, eventData)
-}
-
-// Store is a paid mutator transaction binding the contract method 0xfebb7ca1.
-//
-// Solidity: function store(bytes sig, address vault, uint256 nonce, bytes32 tokenMapping, uint256 blockNumber, bytes eventData) returns()
-func (_XEvents *XEventsSession) Store(sig []byte, vault common.Address, nonce *big.Int, tokenMapping [32]byte, blockNumber *big.Int, eventData []byte) (*types.Transaction, error) {
-	return _XEvents.Contract.Store(&_XEvents.TransactOpts, sig, vault, nonce, tokenMapping, blockNumber, eventData)
-}
-
-// Store is a paid mutator transaction binding the contract method 0xfebb7ca1.
-//
-// Solidity: function store(bytes sig, address vault, uint256 nonce, bytes32 tokenMapping, uint256 blockNumber, bytes eventData) returns()
-func (_XEvents *XEventsTransactorSession) Store(sig []byte, vault common.Address, nonce *big.Int, tokenMapping [32]byte, blockNumber *big.Int, eventData []byte) (*types.Transaction, error) {
-	return _XEvents.Contract.Store(&_XEvents.TransactOpts, sig, vault, nonce, tokenMapping, blockNumber, eventData)
 }
 
 // UpdateVaultWatermark is a paid mutator transaction binding the contract method 0x63bea0d9.

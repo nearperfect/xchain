@@ -125,7 +125,7 @@ type ProtocolManager struct {
 	eventMux             *event.TypeMux
 	txCh                 chan core.TxPreEvent // chan for mainnet transactions
 	txSub                event.Subscription
-	vaultEventWithSigCh  chan core.VaultEventWithSig // chan for vault events
+	vaultEventWithSigCh  chan sentinel.VaultEventWithSig // chan for vault events
 	vaultEventWithSigSub event.Subscription
 	shardingTxCh         chan core.ShardingTxEvent // chan for sharding chan transactions
 	shardingTxSub        event.Subscription
@@ -344,7 +344,7 @@ func (pm *ProtocolManager) Start(maxPeers int) {
 	pm.shardingTxSub = pm.txpool.SubscribeShardingTxEvent(pm.shardingTxCh)
 
 	// broadcast vault events
-	pm.vaultEventWithSigCh = make(chan core.VaultEventWithSig, vaultEventChanSize)
+	pm.vaultEventWithSigCh = make(chan sentinel.VaultEventWithSig, vaultEventChanSize)
 	pm.vaultEventWithSigSub = pm.sentinel.SubscribeVaultEventWithSig(pm.vaultEventWithSigCh)
 
 	// broadcast tx
@@ -1170,7 +1170,7 @@ func (pm *ProtocolManager) handleMainnetMsg(p *Peer, msg p2p.Msg) error {
 
 	case msg.Code == VaultEventMsg:
 		log.Debugf("  vault event received !!!!!!!!!!!!!!")
-		var vaultEventWithSigs []*core.VaultEventWithSig
+		var vaultEventWithSigs []*sentinel.VaultEventWithSig
 		// Parse all vault events
 		if err := msg.Decode(&vaultEventWithSigs); err != nil {
 			return ErrResp(ErrDecode, "vault events msg parse error: %v: %v", msg, err)
@@ -1262,7 +1262,7 @@ func (pm *ProtocolManager) BroadcastTx(tx *types.Transaction) {
 	}
 }
 
-func (pm *ProtocolManager) BroadcastVaultEventWithSig(vaultEventWithSig *core.VaultEventWithSig) {
+func (pm *ProtocolManager) BroadcastVaultEventWithSig(vaultEventWithSig *sentinel.VaultEventWithSig) {
 	log.Debugf("Vault event: %s", vaultEventWithSig)
 	peerSet := pm.p2pManager.peerSet
 	if peerSet == nil {
@@ -1270,7 +1270,7 @@ func (pm *ProtocolManager) BroadcastVaultEventWithSig(vaultEventWithSig *core.Va
 	}
 	peers := peerSet.PeersWithoutVaultEventWithSig(vaultEventWithSig.Hash())
 	for _, peer := range peers {
-		peer.AsyncSendVaultEventWithSigs(core.VaultEventWithSigs{vaultEventWithSig})
+		peer.AsyncSendVaultEventWithSigs(sentinel.VaultEventWithSigs{vaultEventWithSig})
 	}
 }
 

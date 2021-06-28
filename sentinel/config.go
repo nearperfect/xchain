@@ -28,6 +28,10 @@ import (
 	"github.com/MOACChain/MoacLib/log"
 )
 
+const (
+	ConfigCheckInterval = 30
+)
+
 /*
 (chain x id, chain x rpc, chain prefix, vaultx contract address) <- watch deposit
 (chain y id, chain y rpc, chain prefix, vaulty contract address) <- watch burn
@@ -46,6 +50,7 @@ type VaultConfig struct {
 	ChainFuncPrefix string `json:"prefix"  gencodec:"required"`
 	VaultAddress    string `json:"address"  gencodec:"required"`
 	GasPrice        uint64 `json:"gasprice" gencodec:"required"`
+	AvgBlockTime    uint64 `json:"blocktime" gencodec:"required"`
 }
 
 type VaultPairConfig struct {
