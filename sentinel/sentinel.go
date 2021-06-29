@@ -50,7 +50,7 @@ const (
 	ScanStep                             = uint64(20)
 	MaxBlockNumber                       = uint64(1000000000000)
 	Gwei                                 = int64(1000000000)
-	DefaultGasPrice                      = int64(5) * Gwei
+	DefaultGasPrice                      = int64(20) * Gwei
 	DefaultGasLimit                      = int64(300000)
 	BlockDelay                           = 12
 	MaxEmptyBatchBlocks                  = 200
@@ -432,9 +432,9 @@ func (sentinel *Sentinel) getTransactor(
 		chainId,
 	)
 	transactor.GasPrice = big.NewInt(gasPrice)
+	transactor.GasLimit = uint64(gasLimit)
 
 	/*
-		transactor.GasLimit = uint64(gasLimit)
 		nonceAt, err := client.NonceAt(context.Background(), sentinel.key.Address, nil)
 		if err != nil {
 			return nil
