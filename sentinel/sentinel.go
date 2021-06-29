@@ -432,13 +432,15 @@ func (sentinel *Sentinel) getTransactor(
 		chainId,
 	)
 	transactor.GasPrice = big.NewInt(gasPrice)
-	transactor.GasLimit = uint64(gasLimit)
 
-	nonceAt, err := client.NonceAt(context.Background(), sentinel.key.Address, nil)
-	if err != nil {
-		return nil
-	}
-	transactor.Nonce = big.NewInt(int64(nonceAt))
+	/*
+		transactor.GasLimit = uint64(gasLimit)
+		nonceAt, err := client.NonceAt(context.Background(), sentinel.key.Address, nil)
+		if err != nil {
+			return nil
+		}
+		transactor.Nonce = big.NewInt(int64(nonceAt))
+	*/
 
 	return transactor
 }
@@ -788,6 +790,7 @@ func (sentinel *Sentinel) scanVaultEvents(
 			}
 		}
 
+		logFunc("[scanVaultEvents] batch size = %d, start block = %d, end block = %d", len(batch), startBlock, endBlock)
 		// corner case where we scan many blocks but getting no events
 		if endBlock-startBlock >= MaxEmptyBatchBlocks && len(batch) == 0 {
 			return &VaultEventsBatch{
@@ -942,7 +945,7 @@ func (sentinel *Sentinel) commitBatch(
 			vaultEvent.BlockNumber,
 			vaultEvent.Bytes(),
 		)
-		transactor.Nonce = big.NewInt(transactor.Nonce.Int64() + 1)
+		//transactor.Nonce = big.NewInt(transactor.Nonce.Int64() + 1)
 
 		if err != nil {
 			errors += 1
@@ -1148,7 +1151,7 @@ func (sentinel *Sentinel) scanAndForwardVaultEvents(
 					vaultEvent.Tip,
 					vaultEvent.Nonce,
 				)
-				transactor.Nonce = big.NewInt(transactor.Nonce.Int64() + 1)
+				//transactor.Nonce = big.NewInt(transactor.Nonce.Int64() + 1)
 
 				if err != nil {
 					errors += 1
@@ -1174,7 +1177,7 @@ func (sentinel *Sentinel) scanAndForwardVaultEvents(
 					vaultEvent.Tip,
 					vaultEvent.Nonce,
 				)
-				transactor.Nonce = big.NewInt(transactor.Nonce.Int64() + 1)
+				//transactor.Nonce = big.NewInt(transactor.Nonce.Int64() + 1)
 
 				if err != nil {
 					errors += 1
