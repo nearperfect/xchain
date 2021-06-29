@@ -53,7 +53,7 @@ const (
 	DefaultGasPrice                      = int64(20) * Gwei
 	DefaultGasLimit                      = int64(300000)
 	BlockDelay                           = 12
-	MaxEmptyBatchBlocks                  = 200
+	MaxEmptyBatchBlocks                  = 100
 	MintBatchSize                        = 30
 	MintIntervalBlocks                   = 50
 	MyTurnSeed                           = 10000
@@ -1014,7 +1014,7 @@ func (sentinel *Sentinel) watchVault(xdefiContext *XdefiContext) {
 
 					// wait for the new store counter to increase and then update vault water mark
 					//oldBatchPass := newStoreCounter.Uint64() == batch.StoreCounter && uint64(len(batch.Batch)) == omitted
-					oldBatchPass := false
+					oldBatchPass := uint64(len(batch.Batch)) == omitted
 					newBatchPass := newStoreCounter.Uint64() == batch.StoreCounter+uint64(len(batch.Batch))
 					if oldBatchPass || newBatchPass {
 						logFunc(

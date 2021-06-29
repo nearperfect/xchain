@@ -15,7 +15,6 @@ import (
 )
 
 func main() {
-	//client, err := mcclient.Dial("http://172.21.0.11:8545")
 	client, err := mcclient.Dial("http://192.168.0.156:18545")
 	if err != nil {
 		log.Fatalf("Unable to connect to network:%v\n", err)
@@ -43,9 +42,7 @@ func main() {
 	}
 	log.Printf("0x%x, %d, %d\n", fromAddress, chainID, nonce)
 
-	//xeventsAddr := common.HexToAddress("0x2E32C6F7630ca3f06EfAbEaDa1da0Bd28aA18FEA")
 	xeventsAddr := common.HexToAddress("0x0000000000000000000000000000000000010000")
-	//xeventsAddr := common.HexToAddress("0x0000000000000000000000000000000000000065")
 	xevents, _ := xdefi.NewXEvents(
 		xeventsAddr,
 		client,
