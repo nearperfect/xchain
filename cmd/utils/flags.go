@@ -1097,10 +1097,16 @@ func MakeChain(ctx *cli.Context, node *node.Node, recoverMode bool) (chain *core
 
 	engine := ethash.NewFaker()
 	if !ctx.GlobalBool(FakePoWFlag.Name) {
-		engine = ethash.New(
-			node.ResolvePath(mc.DefaultConfig.EthashCacheDir), mc.DefaultConfig.EthashCachesInMem, mc.DefaultConfig.EthashCachesOnDisk,
-			node.ResolvePath(mc.DefaultConfig.EthashDatasetDir), mc.DefaultConfig.EthashDatasetsInMem, mc.DefaultConfig.EthashDatasetsOnDisk,
-		)
+		ethashConfig := ethash.Config{
+			PowMode:        ethash.ModeNormal,
+			CacheDir:       node.ResolvePath(mc.DefaultConfig.EthashCacheDir),
+			CachesInMem:    mc.DefaultConfig.EthashCachesInMem,
+			CachesOnDisk:   mc.DefaultConfig.EthashCachesOnDisk,
+			DatasetDir:     node.ResolvePath(mc.DefaultConfig.EthashDatasetDir),
+			DatasetsInMem:  mc.DefaultConfig.EthashDatasetsInMem,
+			DatasetsOnDisk: mc.DefaultConfig.EthashDatasetsOnDisk,
+		}
+		engine = ethash.New(ethashConfig)
 	}
 
 	config, _, err := core.SetupGenesisBlock(chainDb, MakeGenesis(ctx), recoverMode)
