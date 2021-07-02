@@ -280,8 +280,16 @@ func CreateConsensusEngine(ctx *node.ServiceContext, config *Config, chainConfig
 		log.Warn("Ethash used in shared mode")
 		return ethash.NewShared()
 	default:
-		engine := ethash.New(ctx.ResolvePath(config.EthashCacheDir), config.EthashCachesInMem, config.EthashCachesOnDisk,
-			config.EthashDatasetDir, config.EthashDatasetsInMem, config.EthashDatasetsOnDisk)
+		ethashConfig := ethash.Config{
+			PowMode:        ethash.ModeNormal,
+			CacheDir:       ctx.ResolvePath(config.EthashCacheDir),
+			CachesInMem:    config.EthashCachesInMem,
+			CachesOnDisk:   config.EthashCachesOnDisk,
+			DatasetDir:     config.EthashDatasetDir,
+			DatasetsInMem:  config.EthashDatasetsInMem,
+			DatasetsOnDisk: config.EthashDatasetsOnDisk,
+		}
+		engine := ethash.New(ethashConfig)
 		engine.SetThreads(-1) // Disable CPU mining
 		return engine
 	}

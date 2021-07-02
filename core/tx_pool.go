@@ -163,7 +163,7 @@ var DefaultTxPoolConfig = TxPoolConfig{
 	AccountQueue: 8196,
 	GlobalQueue:  8196,
 
-	Lifetime: 3 * time.Minute,
+	Lifetime: 1 * time.Minute,
 }
 
 // sanitize checks the provided user configurations and changes anything that's

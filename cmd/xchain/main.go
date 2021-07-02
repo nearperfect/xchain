@@ -231,7 +231,7 @@ func moac(ctx *cli.Context) error {
  */
 func initLog(ctx *cli.Context) error {
 	absLogPath, _ := filepath.Abs("./_logs")
-	absLogPath = absLogPath + "/moac"
+	absLogPath = absLogPath + "/" + params.LogFilePrefix
 	if err := os.MkdirAll(filepath.Dir(absLogPath), os.ModePerm); err != nil {
 		log.Errorf("Error %v in create %s", err, absLogPath)
 		return err

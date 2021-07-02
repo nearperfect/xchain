@@ -59,7 +59,7 @@ const (
 	DefaultGasPrice                      = int64(5) * Gwei
 	DefaultGasLimit                      = int64(300000)
 	BlockDelay                           = 12
-	MaxEmptyBatchBlocks                  = 200
+	MaxEmptyBatchBlocks                  = 60
 	MintBatchSize                        = 30
 	MintIntervalBlocks                   = 50
 	MyTurnSeed                           = 10000
@@ -620,14 +620,14 @@ func (sentinel *Sentinel) getTransactor(
 		chainId,
 	)
 	transactor.GasPrice = big.NewInt(gasPrice)
-	transactor.GasLimit = uint64(gasLimit)
+	//transactor.GasLimit = uint64(gasLimit)
 
-	nonceAt, err := client.NonceAt(context.Background(), sentinel.key.Address, nil)
-	sentinel.LogRpcStat("vault", "NonceAt")
-	if err != nil {
-		return nil
-	}
-	transactor.Nonce = big.NewInt(int64(nonceAt))
+	//nonceAt, err := client.NonceAt(context.Background(), sentinel.key.Address, nil)
+	//sentinel.LogRpcStat("vault", "NonceAt")
+	//if err != nil {
+	//	return nil
+	//}
+	//transactor.Nonce = big.NewInt(int64(nonceAt))
 
 	return transactor
 }
@@ -714,6 +714,7 @@ func (sentinel *Sentinel) prepareCommonContext(
 	xdefiContext.EventType = eventType
 	xdefiContext.Config = xdefiContextConfig
 	xdefiContext.Sentinel = sentinel
+	xdefiContext.ConfigVersion = configVersion
 
 	log.Infof("Xdefi context config: %s", xdefiContext.Config)
 
@@ -728,14 +729,14 @@ func (sentinel *Sentinel) prepareCommonContext(
 	}
 }
 
-func (sentinel *Sentinel) initVaultParams(xdefiContext *XdefiContext) uint64 {
+func (sentinel *Sentinel) getLastBlock(xdefiContext *XdefiContext) uint64 {
 	xevents := xdefiContext.Xevents()
 	vaultAddrFrom := xdefiContext.VaultAddrFrom()
 	callOpts := &bind.CallOpts{}
 	vaultWatermark, err := xevents.VaultWatermark(callOpts, vaultAddrFrom)
 	sentinel.LogRpcStat("xevents", "VaultWatermark")
 	if err != nil {
-		log.Errorf("[initVaultParams]\t client watermark block err: %v       -----", err)
+		log.Errorf("[getLastBlock]\t client watermark block err: %v -------", err)
 		return 0
 	}
 
@@ -752,7 +753,7 @@ func (sentinel *Sentinel) initVaultParams(xdefiContext *XdefiContext) uint64 {
 		}
 		if err != nil {
 			log.Errorf(
-				"[initVaultParams]\t client CreateAt err: %v, set lastBlock to %d",
+				"[getLastBlock]\t client CreateAt err: %v, set lastBlock to %d",
 				err, lastBlock,
 			)
 			return 0
@@ -765,7 +766,7 @@ func (sentinel *Sentinel) initVaultParams(xdefiContext *XdefiContext) uint64 {
 		// we've scanned watermark block, proceed to next one
 		lastBlock = vaultWatermark.Uint64() + 1
 		if err != nil {
-			log.Errorf("[initVaultParams]\t client vault store counter error %v      ", err)
+			log.Errorf("[getLastBlock]\t client vault store counter error %v      ", err)
 			return 0
 		}
 	}
@@ -776,10 +777,8 @@ func (sentinel *Sentinel) initVaultParams(xdefiContext *XdefiContext) uint64 {
 	return lastBlock
 }
 
-func (sentinel *Sentinel) scanVaultEvents(
-	xdefiContext *XdefiContext,
-	lastBlock uint64,
-) *VaultEventsBatch {
+func (sentinel *Sentinel) scanVaultEvents(xdefiContext *XdefiContext) *VaultEventsBatch {
+	lastBlock := sentinel.getLastBlock(xdefiContext)
 	eventCount := uint64(0)
 	vaultX := xdefiContext.VaultX
 	vaultY := xdefiContext.VaultY
@@ -1124,7 +1123,7 @@ func (sentinel *Sentinel) commitBatch(
 			vaultEvent.Bytes(),
 		)
 		sentinel.LogRpcStat("xevents", "Store")
-		transactor.Nonce = big.NewInt(transactor.Nonce.Int64() + 1)
+		//transactor.Nonce = big.NewInt(transactor.Nonce.Int64() + 1)
 		if err != nil {
 			errors = append(errors, vaultEvent.Nonce.Uint64())
 			logFuncErr("[  commitBatch  ]\t Vault FROM sentinel xevents store err: %v", err)
@@ -1159,25 +1158,21 @@ func (sentinel *Sentinel) watchVault(xdefiContext *XdefiContext) {
 			// if there is a new config, stop all current watchers
 			// since new ones will be created with updated config.
 			// The if statement prevents accidentally kill new watchers.
+			logFunc("[watchVault] new config version received: %d -> %d",
+				xdefiContext.ConfigVersion, newConfigVersion,
+			)
 			if newConfigVersion > xdefiContext.ConfigVersion {
-				break
+				return
 			}
 		case <-ticker.C:
-			sentinel.PrintRpcStat()
-			// # 0
-			xevents := xdefiContext.Xevents()
-			lastBlock := sentinel.initVaultParams(xdefiContext)
-
-			// # 1
-			batch := sentinel.scanVaultEvents(
-				xdefiContext,
-				lastBlock,
-			)
-
+			if len(newConfigChan) > 0 {
+				logFunc("[watchVault] new config version in channel, ignore ticker")
+				continue
+			}
+			batch := sentinel.scanVaultEvents(xdefiContext)
 			if batch == nil {
 				continue
 			}
-
 			if sentinel.myTurn(MyTurnSeed) {
 				blockNumberBefore, _ := xdefiContext.ClientXevents.BlockNumber(context.Background())
 
@@ -1204,6 +1199,7 @@ func (sentinel *Sentinel) watchVault(xdefiContext *XdefiContext) {
 					blockNumberAfter, _ := xdefiContext.ClientXevents.BlockNumber(context.Background())
 					// wait till one block is mined and all txs in the batch confirmed
 					if blockNumberAfter > blockNumberBefore && len(succeeded) == len(batch.Batch) {
+						xevents := xdefiContext.Xevents()
 						xevents.UpdateVaultWatermark(
 							transactor,
 							batch.Vault,
@@ -1344,7 +1340,7 @@ func (sentinel *Sentinel) ForwardVaultEvents(
 					vaultEvent.Nonce,
 				)
 				sentinel.LogRpcStat("vault", "Mint")
-				transactor.Nonce = big.NewInt(transactor.Nonce.Int64() + 1)
+				//transactor.Nonce = big.NewInt(transactor.Nonce.Int64() + 1)
 
 				if err != nil {
 					errors += 1
@@ -1371,7 +1367,7 @@ func (sentinel *Sentinel) ForwardVaultEvents(
 					vaultEvent.Nonce,
 				)
 				sentinel.LogRpcStat("vault", "Withdraw")
-				transactor.Nonce = big.NewInt(transactor.Nonce.Int64() + 1)
+				//transactor.Nonce = big.NewInt(transactor.Nonce.Int64() + 1)
 
 				if err != nil {
 					errors += 1
@@ -1457,10 +1453,17 @@ func (sentinel *Sentinel) doForward(
 		case <-sub.Err():
 			break
 		case newConfigVersion := <-newConfigChan:
+			logFunc("[doForward] new config version received: %d -> %d",
+				xdefiContext.ConfigVersion, newConfigVersion,
+			)
 			if newConfigVersion > xdefiContext.ConfigVersion {
-				break
+				return
 			}
 		case <-ticker.C:
+			if len(newConfigChan) > 0 {
+				logFunc("[doForward] new config version in channel, ignore ticker")
+				continue
+			}
 			sentinel.ForwardVaultEvents(
 				xdefiContext,
 				tokenMapping,
@@ -1484,6 +1487,9 @@ func (sentinel *Sentinel) startWatchersAndForwarders() {
 			for i := 0; i < len(newConfigChan); i++ {
 				newConfigVersion = <-newConfigChan
 			}
+			log.Infof("[startWatchersAndForwarders] new config version received: %d -> %d",
+				sentinel.configVersion, newConfigVersion,
+			)
 			log.Infof("sentinel: new config version received: %d", newConfigVersion)
 
 			if newConfigVersion != sentinel.configVersion {

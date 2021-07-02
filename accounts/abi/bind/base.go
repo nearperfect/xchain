@@ -24,6 +24,7 @@ import (
 
 	"github.com/MOACChain/MoacLib/common"
 	"github.com/MOACChain/MoacLib/crypto"
+	"github.com/MOACChain/MoacLib/log"
 	"github.com/MOACChain/MoacLib/types"
 	"github.com/MOACChain/xchain"
 	"github.com/MOACChain/xchain/accounts/abi"
@@ -246,6 +247,8 @@ func (c *BoundContract) transact(opts *TransactOpts, contract *common.Address, i
 		gasLimit, err = c.transactor.EstimateGas(ensureContext(opts.Context), msg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to estimate gas needed: %v", err)
+		} else {
+			log.Infof("estimated gas: %d, method: %x, input size: %d", gasLimit, input[:4], len(input))
 		}
 	}
 	// Create the transaction, sign it and schedule it for execution

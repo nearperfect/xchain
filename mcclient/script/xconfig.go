@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"log"
-	"math/big"
 	"os"
 	"time"
 
@@ -74,13 +73,8 @@ func main() {
 		return
 	}
 	transactor, _ := bind.NewKeyedTransactorWithChainID(privateKey, chainID)
-	nonceAt, err := client.NonceAt(context.Background(), fromAddress, nil)
-	if err != nil {
-		log.Printf("fail get nonce: %v", err)
-		return
-	}
-	transactor.Nonce = big.NewInt(int64(nonceAt))
 
+	// call initilaize()
 	tx, err := xconfig.Initialize(transactor)
 	if err != nil {
 		log.Printf("Call xconfig Initialize() failed: %v", err)
@@ -99,10 +93,7 @@ func main() {
 		}
 	}
 
-	transactor.Nonce = big.NewInt(int64(nonceAt) + 1)
-	transactor.GasLimit = uint64(8000000)
-	Gwei := int64(1000000000)
-	transactor.GasPrice = big.NewInt(20 * Gwei)
+	// call updateConfig()
 	tx, err = xconfig.UpdateConfig(transactor, data)
 	if err != nil {
 		log.Printf("call xconfif update config failed: %v", err)
