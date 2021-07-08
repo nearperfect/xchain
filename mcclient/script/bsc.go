@@ -4,14 +4,19 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"log"
-	"math/big"
+	//"math/big"
 
-	"github.com/MOACChain/MoacLib/common"
+	//"github.com/MOACChain/MoacLib/common"
 	"github.com/MOACChain/MoacLib/crypto"
 	//"github.com/MOACChain/MoacLib/types"
-	"github.com/MOACChain/xchain/accounts/abi/bind"
+	//"github.com/MOACChain/xchain/accounts/abi/bind"
 	"github.com/MOACChain/xchain/mcclient"
-	"github.com/MOACChain/xchain/xdefi/vaulty"
+	//"github.com/MOACChain/xchain/xdefi/vaulty"
+)
+
+const (
+	Gwei  = 1000000000.0
+	Ether = float64(1000000000000000000.0)
 )
 
 func main() {
@@ -50,7 +55,10 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	log.Printf("0x%x, %d, %d, %d\n", fromAddress, chainID, nonce, balance)
+	log.Printf("0x%x, chain id: %d, nonce: %d, balance: %.3f\n", fromAddress, chainID, nonce, float64(balance.Uint64())/Ether)
+
+	gasPrice, err := client.SuggestGasPrice(context.Background())
+	log.Printf("BSC suggest gas price: %d", gasPrice.Uint64()/Gwei)
 
 	///////////////////////////////////////////////
 	///////////////////////////////////////////////
@@ -91,44 +99,45 @@ func main() {
 
 	/////////////////////////////////////////////////////////////
 	////////////scan filter
-	vaultYAddr := common.HexToAddress("0xdBF16E1A4510bEa90a015691258FEDB111ddf10E")
-	vaultyContract, err := vaulty.NewVaultY(
-		vaultYAddr,
-		client,
-	)
-
-	last := uint64(10005800)
-	filterOpts := &bind.FilterOpts{
-		Context: context.Background(),
-		Start:   10005600,
-		End:     &last,
-	}
-
-	itrY, err := vaultyContract.FilterTokenBurn(
-		filterOpts,
-		[]common.Address{},
-		[]common.Address{},
-		[]*big.Int{},
-	)
-
-	if err != nil {
-		log.Printf("%v", err)
-	}
-
-	for itrY.Next() {
-		event := itrY.Event
-		log.Printf(
-			"\n, %d\n, %x\n, %d\n, %x\n, %x\n, %v\n, %v\n, %v\n, %v\n",
-
-			event.SourceChainid,
-			event.SourceToken,
-			event.MappedChainid,
-			event.MappedToken,
-			event.From,
-			event.Amount,
-			event.Nonce,
-			event.BlockNumber,
-			event.Tip,
+	/*
+		vaultYAddr := common.HexToAddress("0xdBF16E1A4510bEa90a015691258FEDB111ddf10E")
+		vaultyContract, err := vaulty.NewVaultY(
+			vaultYAddr,
+			client,
 		)
-	}
+
+		last := uint64(10005800)
+		filterOpts := &bind.FilterOpts{
+			Context: context.Background(),
+			Start:   10005600,
+			End:     &last,
+		}
+
+		itrY, err := vaultyContract.FilterTokenBurn(
+			filterOpts,
+			[]common.Address{},
+			[]common.Address{},
+			[]*big.Int{},
+		)
+
+		if err != nil {
+			log.Printf("%v", err)
+		}
+
+		for itrY.Next() {
+			event := itrY.Event
+			log.Printf(
+				"\n, %d\n, %x\n, %d\n, %x\n, %x\n, %v\n, %v\n, %v\n, %v\n",
+
+				event.SourceChainid,
+				event.SourceToken,
+				event.MappedChainid,
+				event.MappedToken,
+				event.From,
+				event.Amount,
+				event.Nonce,
+				event.BlockNumber,
+				event.Tip,
+			)
+		}*/
 }

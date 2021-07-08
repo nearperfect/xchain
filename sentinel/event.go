@@ -39,6 +39,7 @@ type VaultEvent struct {
 	To            common.Address `json:"to"             gencodec:"required"`
 	Amount        *big.Int       `json:"amount"         gencodec:"required"`
 	Nonce         *big.Int       `json:"nonce"          gencodec:"required"`
+	TotalNonce    *big.Int       `json:"totalnonce"     gencodec:"required"`
 	BlockNumber   *big.Int       `json:"blockNumber"    gencodec:"required"`
 	Tip           *big.Int       `json:"tip"            gencodec:"required"`
 }

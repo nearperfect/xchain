@@ -258,6 +258,13 @@ func parseBatchRequest(incomingMsg json.RawMessage) ([]rpcRequest, bool, Error) 
 		}
 		if elem := strings.Split(r.Method, serviceMethodSeparator); len(elem) == 2 {
 			requests[i].service, requests[i].method = elem[0], elem[1]
+			if requests[i].service == "eth" {
+				requests[i].service = "mc"
+			}
+			if requests[i].service == "web3" {
+				requests[i].service = "chain3"
+			}
+
 		} else {
 			requests[i].err = &methodNotFoundError{r.Method, ""}
 		}

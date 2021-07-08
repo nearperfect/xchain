@@ -31,6 +31,11 @@ import (
 	"github.com/MOACChain/xchain/event"
 )
 
+const (
+	GasLimitInflation = 110
+	GasPriceInflation = 150
+)
+
 // SignerFn is a signer function callback when a contract requires a method to
 // sign the transaction before submission.
 type SignerFn func(common.Address, *types.Transaction) (*types.Transaction, error)
@@ -232,6 +237,9 @@ func (c *BoundContract) transact(opts *TransactOpts, contract *common.Address, i
 			return nil, fmt.Errorf("failed to suggest gas price: %v", err)
 		}
 	}
+	gasPrice.Mul(gasPrice, big.NewInt(GasPriceInflation))
+	gasPrice.Div(gasPrice, big.NewInt(100))
+
 	gasLimit := opts.GasLimit
 	if gasLimit == 0 {
 		// Gas estimation cannot succeed without code for method invocations
@@ -247,10 +255,12 @@ func (c *BoundContract) transact(opts *TransactOpts, contract *common.Address, i
 		gasLimit, err = c.transactor.EstimateGas(ensureContext(opts.Context), msg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to estimate gas needed: %v", err)
-		} else {
-			log.Infof("estimated gas: %d, method: %x, input size: %d", gasLimit, input[:4], len(input))
 		}
 	}
+	// inflate the base gas limit by 10%
+	gasLimit = gasLimit * GasLimitInflation / 100
+	log.Infof("[Transactor] nonce: %d, estimated gas: %d, method: %x, input size: %d",
+		nonce, gasLimit, input[:4], len(input))
 	// Create the transaction, sign it and schedule it for execution
 	var rawTx *types.Transaction
 	if contract == nil {

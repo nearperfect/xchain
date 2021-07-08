@@ -1178,7 +1178,7 @@ func (pm *ProtocolManager) handleMainnetMsg(p *Peer, msg p2p.Msg) error {
 
 		for _, vaultEventWithSig := range vaultEventWithSigs {
 			p.MarkVaultEventWithSigs(vaultEventWithSig.Hash())
-			pm.sentinel.RecordVaultEventWithSig(vaultEventWithSig)
+			pm.sentinel.ProcessVaultEventWithSig(vaultEventWithSig)
 			// sent to peers who don't have the event
 			pm.vaultEventWithSigCh <- *vaultEventWithSig
 		}

@@ -49,7 +49,7 @@ type VaultConfig struct {
 	ChainWS         string `json:"ws"  gencodec:"required"`
 	ChainFuncPrefix string `json:"prefix"  gencodec:"required"`
 	VaultAddress    string `json:"address"  gencodec:"required"`
-	GasPrice        uint64 `json:"gasprice" gencodec:"required"`
+	GasPrice        uint64 `json:"gasprice"`
 	AvgBlockTime    uint64 `json:"blocktime" gencodec:"required"`
 }
 

@@ -32,8 +32,17 @@ type RoleAccessRole struct {
 	Describe string
 }
 
+// XEventsVaultEventExt is an auto generated low-level Go binding around an user-defined struct.
+type XEventsVaultEventExt struct {
+	Sig          []byte
+	Vault        common.Address
+	Nonce        *big.Int
+	TokenMapping [32]byte
+	EventData    []byte
+}
+
 // XEventsABI is the input ABI used to generate the binding from.
-const XEventsABI = "[{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"previousAdminRole\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"newAdminRole\",\"type\":\"bytes32\"}],\"name\":\"RoleAdminChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"}],\"name\":\"RoleGranted\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"}],\"name\":\"RoleRevoked\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"DEFAULT_ADMIN_ROLE\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\",\"constant\":true},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"member\",\"type\":\"address\"}],\"name\":\"addRoleMember\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"}],\"name\":\"getRoleAdmin\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\",\"constant\":true},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"index\",\"type\":\"uint256\"}],\"name\":\"getRoleMember\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\",\"constant\":true},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"}],\"name\":\"getRoleMemberCount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\",\"constant\":true},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"}],\"name\":\"getRoleMembers\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"}],\"stateMutability\":\"view\",\"type\":\"function\",\"constant\":true},{\"inputs\":[],\"name\":\"getRoles\",\"outputs\":[{\"components\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"string\",\"name\":\"describe\",\"type\":\"string\"}],\"internalType\":\"structRoleAccess.Role[]\",\"name\":\"\",\"type\":\"tuple[]\"}],\"stateMutability\":\"pure\",\"type\":\"function\",\"constant\":true},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"grantRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"hasRole\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\",\"constant\":true},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"mintWatermark\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\",\"constant\":true},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"member\",\"type\":\"address\"}],\"name\":\"removeRoleMember\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"renounceRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"revokeRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"interfaceId\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\",\"constant\":true},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"tokenMappingWatermark\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\",\"constant\":true},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"vaultEventDone\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\",\"constant\":true},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"vaultEvents\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"eventData\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"sig\",\"type\":\"bytes\"},{\"internalType\":\"uint256\",\"name\":\"blockNumber\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\",\"constant\":true},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"vaultWatermark\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\",\"constant\":true},{\"inputs\":[],\"name\":\"initialize\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"sig\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"vault\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"nonce\",\"type\":\"uint256\"},{\"internalType\":\"bytes32\",\"name\":\"tokenMapping\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"blockNumber\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"eventData\",\"type\":\"bytes\"}],\"name\":\"RecordVaultEvent\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"vault\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"blockNumber\",\"type\":\"uint256\"}],\"name\":\"updateVaultWatermark\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"vault\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"tokenMapping\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"nonce\",\"type\":\"uint256\"}],\"name\":\"done\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"vault\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"blockNumber\",\"type\":\"uint256\"}],\"name\":\"rescueVault\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"vault\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"tokenMapping\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"nonce\",\"type\":\"uint256\"}],\"name\":\"rescueTokenMapping\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
+const XEventsABI = "[{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"Paused\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"previousAdminRole\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"newAdminRole\",\"type\":\"bytes32\"}],\"name\":\"RoleAdminChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"}],\"name\":\"RoleGranted\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"}],\"name\":\"RoleRevoked\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"Unpaused\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"DEFAULT_ADMIN_ROLE\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"member\",\"type\":\"address\"}],\"name\":\"addRoleMember\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"}],\"name\":\"getRoleAdmin\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"index\",\"type\":\"uint256\"}],\"name\":\"getRoleMember\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"}],\"name\":\"getRoleMemberCount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"}],\"name\":\"getRoleMembers\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getRoles\",\"outputs\":[{\"components\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"string\",\"name\":\"describe\",\"type\":\"string\"}],\"internalType\":\"structRoleAccess.Role[]\",\"name\":\"\",\"type\":\"tuple[]\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"grantRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"hasRole\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"mintWatermark\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"paused\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"member\",\"type\":\"address\"}],\"name\":\"removeRoleMember\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"renounceRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"revokeRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"interfaceId\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"tokenMappingWatermark\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"vaultEventDone\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"vaultEvents\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"sig\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"eventData\",\"type\":\"bytes\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"vaultWatermark\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"initialize\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"bytes\",\"name\":\"sig\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"vault\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"nonce\",\"type\":\"uint256\"},{\"internalType\":\"bytes32\",\"name\":\"tokenMapping\",\"type\":\"bytes32\"},{\"internalType\":\"bytes\",\"name\":\"eventData\",\"type\":\"bytes\"}],\"internalType\":\"structXEvents.VaultEventExt[]\",\"name\":\"vaultEventExts\",\"type\":\"tuple[]\"}],\"name\":\"RecordVaultEventBatch\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"sig\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"vault\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"nonce\",\"type\":\"uint256\"},{\"internalType\":\"bytes32\",\"name\":\"tokenMapping\",\"type\":\"bytes32\"},{\"internalType\":\"bytes\",\"name\":\"eventData\",\"type\":\"bytes\"}],\"name\":\"RecordVaultEvent\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"vault\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"blockNumber\",\"type\":\"uint256\"}],\"name\":\"updateVaultWatermark\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"vault\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"tokenMapping\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"nonce\",\"type\":\"uint256\"}],\"name\":\"done\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"vault\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"blockNumber\",\"type\":\"uint256\"}],\"name\":\"rescueVault\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"vault\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"tokenMapping\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"nonce\",\"type\":\"uint256\"}],\"name\":\"rescueTokenMapping\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"validator\",\"type\":\"address\"}],\"name\":\"grantValidator\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"pause\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"unpause\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
 
 // XEvents is an auto generated Go binding around an Ethereum contract.
 type XEvents struct {
@@ -425,6 +434,37 @@ func (_XEvents *XEventsCallerSession) MintWatermark(arg0 common.Address, arg1 [3
 	return _XEvents.Contract.MintWatermark(&_XEvents.CallOpts, arg0, arg1)
 }
 
+// Paused is a free data retrieval call binding the contract method 0x5c975abb.
+//
+// Solidity: function paused() view returns(bool)
+func (_XEvents *XEventsCaller) Paused(opts *bind.CallOpts) (bool, error) {
+	var out []interface{}
+	err := _XEvents.contract.Call(opts, &out, "paused")
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
+}
+
+// Paused is a free data retrieval call binding the contract method 0x5c975abb.
+//
+// Solidity: function paused() view returns(bool)
+func (_XEvents *XEventsSession) Paused() (bool, error) {
+	return _XEvents.Contract.Paused(&_XEvents.CallOpts)
+}
+
+// Paused is a free data retrieval call binding the contract method 0x5c975abb.
+//
+// Solidity: function paused() view returns(bool)
+func (_XEvents *XEventsCallerSession) Paused() (bool, error) {
+	return _XEvents.Contract.Paused(&_XEvents.CallOpts)
+}
+
 // SupportsInterface is a free data retrieval call binding the contract method 0x01ffc9a7.
 //
 // Solidity: function supportsInterface(bytes4 interfaceId) view returns(bool)
@@ -520,27 +560,24 @@ func (_XEvents *XEventsCallerSession) VaultEventDone(arg0 common.Address, arg1 [
 
 // VaultEvents is a free data retrieval call binding the contract method 0x68741d5e.
 //
-// Solidity: function vaultEvents(address , bytes32 , uint256 ) view returns(bytes eventData, bytes sig, uint256 blockNumber)
+// Solidity: function vaultEvents(address , bytes32 , uint256 ) view returns(bytes sig, bytes eventData)
 func (_XEvents *XEventsCaller) VaultEvents(opts *bind.CallOpts, arg0 common.Address, arg1 [32]byte, arg2 *big.Int) (struct {
-	EventData   []byte
-	Sig         []byte
-	BlockNumber *big.Int
+	Sig       []byte
+	EventData []byte
 }, error) {
 	var out []interface{}
 	err := _XEvents.contract.Call(opts, &out, "vaultEvents", arg0, arg1, arg2)
 
 	outstruct := new(struct {
-		EventData   []byte
-		Sig         []byte
-		BlockNumber *big.Int
+		Sig       []byte
+		EventData []byte
 	})
 	if err != nil {
 		return *outstruct, err
 	}
 
-	outstruct.EventData = *abi.ConvertType(out[0], new([]byte)).(*[]byte)
-	outstruct.Sig = *abi.ConvertType(out[1], new([]byte)).(*[]byte)
-	outstruct.BlockNumber = *abi.ConvertType(out[2], new(*big.Int)).(**big.Int)
+	outstruct.Sig = *abi.ConvertType(out[0], new([]byte)).(*[]byte)
+	outstruct.EventData = *abi.ConvertType(out[1], new([]byte)).(*[]byte)
 
 	return *outstruct, err
 
@@ -548,22 +585,20 @@ func (_XEvents *XEventsCaller) VaultEvents(opts *bind.CallOpts, arg0 common.Addr
 
 // VaultEvents is a free data retrieval call binding the contract method 0x68741d5e.
 //
-// Solidity: function vaultEvents(address , bytes32 , uint256 ) view returns(bytes eventData, bytes sig, uint256 blockNumber)
+// Solidity: function vaultEvents(address , bytes32 , uint256 ) view returns(bytes sig, bytes eventData)
 func (_XEvents *XEventsSession) VaultEvents(arg0 common.Address, arg1 [32]byte, arg2 *big.Int) (struct {
-	EventData   []byte
-	Sig         []byte
-	BlockNumber *big.Int
+	Sig       []byte
+	EventData []byte
 }, error) {
 	return _XEvents.Contract.VaultEvents(&_XEvents.CallOpts, arg0, arg1, arg2)
 }
 
 // VaultEvents is a free data retrieval call binding the contract method 0x68741d5e.
 //
-// Solidity: function vaultEvents(address , bytes32 , uint256 ) view returns(bytes eventData, bytes sig, uint256 blockNumber)
+// Solidity: function vaultEvents(address , bytes32 , uint256 ) view returns(bytes sig, bytes eventData)
 func (_XEvents *XEventsCallerSession) VaultEvents(arg0 common.Address, arg1 [32]byte, arg2 *big.Int) (struct {
-	EventData   []byte
-	Sig         []byte
-	BlockNumber *big.Int
+	Sig       []byte
+	EventData []byte
 }, error) {
 	return _XEvents.Contract.VaultEvents(&_XEvents.CallOpts, arg0, arg1, arg2)
 }
@@ -599,25 +634,46 @@ func (_XEvents *XEventsCallerSession) VaultWatermark(arg0 common.Address) (*big.
 	return _XEvents.Contract.VaultWatermark(&_XEvents.CallOpts, arg0)
 }
 
-// RecordVaultEvent is a paid mutator transaction binding the contract method 0x0a632c10.
+// RecordVaultEvent is a paid mutator transaction binding the contract method 0x32f00745.
 //
-// Solidity: function RecordVaultEvent(bytes sig, address vault, uint256 nonce, bytes32 tokenMapping, uint256 blockNumber, bytes eventData) returns()
-func (_XEvents *XEventsTransactor) RecordVaultEvent(opts *bind.TransactOpts, sig []byte, vault common.Address, nonce *big.Int, tokenMapping [32]byte, blockNumber *big.Int, eventData []byte) (*types.Transaction, error) {
-	return _XEvents.contract.Transact(opts, "RecordVaultEvent", sig, vault, nonce, tokenMapping, blockNumber, eventData)
+// Solidity: function RecordVaultEvent(bytes sig, address vault, uint256 nonce, bytes32 tokenMapping, bytes eventData) returns()
+func (_XEvents *XEventsTransactor) RecordVaultEvent(opts *bind.TransactOpts, sig []byte, vault common.Address, nonce *big.Int, tokenMapping [32]byte, eventData []byte) (*types.Transaction, error) {
+	return _XEvents.contract.Transact(opts, "RecordVaultEvent", sig, vault, nonce, tokenMapping, eventData)
 }
 
-// RecordVaultEvent is a paid mutator transaction binding the contract method 0x0a632c10.
+// RecordVaultEvent is a paid mutator transaction binding the contract method 0x32f00745.
 //
-// Solidity: function RecordVaultEvent(bytes sig, address vault, uint256 nonce, bytes32 tokenMapping, uint256 blockNumber, bytes eventData) returns()
-func (_XEvents *XEventsSession) RecordVaultEvent(sig []byte, vault common.Address, nonce *big.Int, tokenMapping [32]byte, blockNumber *big.Int, eventData []byte) (*types.Transaction, error) {
-	return _XEvents.Contract.RecordVaultEvent(&_XEvents.TransactOpts, sig, vault, nonce, tokenMapping, blockNumber, eventData)
+// Solidity: function RecordVaultEvent(bytes sig, address vault, uint256 nonce, bytes32 tokenMapping, bytes eventData) returns()
+func (_XEvents *XEventsSession) RecordVaultEvent(sig []byte, vault common.Address, nonce *big.Int, tokenMapping [32]byte, eventData []byte) (*types.Transaction, error) {
+	return _XEvents.Contract.RecordVaultEvent(&_XEvents.TransactOpts, sig, vault, nonce, tokenMapping, eventData)
 }
 
-// RecordVaultEvent is a paid mutator transaction binding the contract method 0x0a632c10.
+// RecordVaultEvent is a paid mutator transaction binding the contract method 0x32f00745.
 //
-// Solidity: function RecordVaultEvent(bytes sig, address vault, uint256 nonce, bytes32 tokenMapping, uint256 blockNumber, bytes eventData) returns()
-func (_XEvents *XEventsTransactorSession) RecordVaultEvent(sig []byte, vault common.Address, nonce *big.Int, tokenMapping [32]byte, blockNumber *big.Int, eventData []byte) (*types.Transaction, error) {
-	return _XEvents.Contract.RecordVaultEvent(&_XEvents.TransactOpts, sig, vault, nonce, tokenMapping, blockNumber, eventData)
+// Solidity: function RecordVaultEvent(bytes sig, address vault, uint256 nonce, bytes32 tokenMapping, bytes eventData) returns()
+func (_XEvents *XEventsTransactorSession) RecordVaultEvent(sig []byte, vault common.Address, nonce *big.Int, tokenMapping [32]byte, eventData []byte) (*types.Transaction, error) {
+	return _XEvents.Contract.RecordVaultEvent(&_XEvents.TransactOpts, sig, vault, nonce, tokenMapping, eventData)
+}
+
+// RecordVaultEventBatch is a paid mutator transaction binding the contract method 0xd623d8ae.
+//
+// Solidity: function RecordVaultEventBatch((bytes,address,uint256,bytes32,bytes)[] vaultEventExts) returns()
+func (_XEvents *XEventsTransactor) RecordVaultEventBatch(opts *bind.TransactOpts, vaultEventExts []XEventsVaultEventExt) (*types.Transaction, error) {
+	return _XEvents.contract.Transact(opts, "RecordVaultEventBatch", vaultEventExts)
+}
+
+// RecordVaultEventBatch is a paid mutator transaction binding the contract method 0xd623d8ae.
+//
+// Solidity: function RecordVaultEventBatch((bytes,address,uint256,bytes32,bytes)[] vaultEventExts) returns()
+func (_XEvents *XEventsSession) RecordVaultEventBatch(vaultEventExts []XEventsVaultEventExt) (*types.Transaction, error) {
+	return _XEvents.Contract.RecordVaultEventBatch(&_XEvents.TransactOpts, vaultEventExts)
+}
+
+// RecordVaultEventBatch is a paid mutator transaction binding the contract method 0xd623d8ae.
+//
+// Solidity: function RecordVaultEventBatch((bytes,address,uint256,bytes32,bytes)[] vaultEventExts) returns()
+func (_XEvents *XEventsTransactorSession) RecordVaultEventBatch(vaultEventExts []XEventsVaultEventExt) (*types.Transaction, error) {
+	return _XEvents.Contract.RecordVaultEventBatch(&_XEvents.TransactOpts, vaultEventExts)
 }
 
 // AddRoleMember is a paid mutator transaction binding the contract method 0x1b65471f.
@@ -683,6 +739,27 @@ func (_XEvents *XEventsTransactorSession) GrantRole(role [32]byte, account commo
 	return _XEvents.Contract.GrantRole(&_XEvents.TransactOpts, role, account)
 }
 
+// GrantValidator is a paid mutator transaction binding the contract method 0xfb01a478.
+//
+// Solidity: function grantValidator(address validator) returns(bool)
+func (_XEvents *XEventsTransactor) GrantValidator(opts *bind.TransactOpts, validator common.Address) (*types.Transaction, error) {
+	return _XEvents.contract.Transact(opts, "grantValidator", validator)
+}
+
+// GrantValidator is a paid mutator transaction binding the contract method 0xfb01a478.
+//
+// Solidity: function grantValidator(address validator) returns(bool)
+func (_XEvents *XEventsSession) GrantValidator(validator common.Address) (*types.Transaction, error) {
+	return _XEvents.Contract.GrantValidator(&_XEvents.TransactOpts, validator)
+}
+
+// GrantValidator is a paid mutator transaction binding the contract method 0xfb01a478.
+//
+// Solidity: function grantValidator(address validator) returns(bool)
+func (_XEvents *XEventsTransactorSession) GrantValidator(validator common.Address) (*types.Transaction, error) {
+	return _XEvents.Contract.GrantValidator(&_XEvents.TransactOpts, validator)
+}
+
 // Initialize is a paid mutator transaction binding the contract method 0x8129fc1c.
 //
 // Solidity: function initialize() returns()
@@ -702,6 +779,27 @@ func (_XEvents *XEventsSession) Initialize() (*types.Transaction, error) {
 // Solidity: function initialize() returns()
 func (_XEvents *XEventsTransactorSession) Initialize() (*types.Transaction, error) {
 	return _XEvents.Contract.Initialize(&_XEvents.TransactOpts)
+}
+
+// Pause is a paid mutator transaction binding the contract method 0x8456cb59.
+//
+// Solidity: function pause() returns()
+func (_XEvents *XEventsTransactor) Pause(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _XEvents.contract.Transact(opts, "pause")
+}
+
+// Pause is a paid mutator transaction binding the contract method 0x8456cb59.
+//
+// Solidity: function pause() returns()
+func (_XEvents *XEventsSession) Pause() (*types.Transaction, error) {
+	return _XEvents.Contract.Pause(&_XEvents.TransactOpts)
+}
+
+// Pause is a paid mutator transaction binding the contract method 0x8456cb59.
+//
+// Solidity: function pause() returns()
+func (_XEvents *XEventsTransactorSession) Pause() (*types.Transaction, error) {
+	return _XEvents.Contract.Pause(&_XEvents.TransactOpts)
 }
 
 // RemoveRoleMember is a paid mutator transaction binding the contract method 0x4dd8fac8.
@@ -809,6 +907,27 @@ func (_XEvents *XEventsTransactorSession) RevokeRole(role [32]byte, account comm
 	return _XEvents.Contract.RevokeRole(&_XEvents.TransactOpts, role, account)
 }
 
+// Unpause is a paid mutator transaction binding the contract method 0x3f4ba83a.
+//
+// Solidity: function unpause() returns()
+func (_XEvents *XEventsTransactor) Unpause(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _XEvents.contract.Transact(opts, "unpause")
+}
+
+// Unpause is a paid mutator transaction binding the contract method 0x3f4ba83a.
+//
+// Solidity: function unpause() returns()
+func (_XEvents *XEventsSession) Unpause() (*types.Transaction, error) {
+	return _XEvents.Contract.Unpause(&_XEvents.TransactOpts)
+}
+
+// Unpause is a paid mutator transaction binding the contract method 0x3f4ba83a.
+//
+// Solidity: function unpause() returns()
+func (_XEvents *XEventsTransactorSession) Unpause() (*types.Transaction, error) {
+	return _XEvents.Contract.Unpause(&_XEvents.TransactOpts)
+}
+
 // UpdateVaultWatermark is a paid mutator transaction binding the contract method 0x63bea0d9.
 //
 // Solidity: function updateVaultWatermark(address vault, uint256 blockNumber) returns()
@@ -828,6 +947,140 @@ func (_XEvents *XEventsSession) UpdateVaultWatermark(vault common.Address, block
 // Solidity: function updateVaultWatermark(address vault, uint256 blockNumber) returns()
 func (_XEvents *XEventsTransactorSession) UpdateVaultWatermark(vault common.Address, blockNumber *big.Int) (*types.Transaction, error) {
 	return _XEvents.Contract.UpdateVaultWatermark(&_XEvents.TransactOpts, vault, blockNumber)
+}
+
+// XEventsPausedIterator is returned from FilterPaused and is used to iterate over the raw logs and unpacked data for Paused events raised by the XEvents contract.
+type XEventsPausedIterator struct {
+	Event *XEventsPaused // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  moaccore.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *XEventsPausedIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(XEventsPaused)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(XEventsPaused)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *XEventsPausedIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *XEventsPausedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// XEventsPaused represents a Paused event raised by the XEvents contract.
+type XEventsPaused struct {
+	Account common.Address
+	Raw     types.Log // Blockchain specific contextual infos
+}
+
+// FilterPaused is a free log retrieval operation binding the contract event 0x62e78cea01bee320cd4e420270b5ea74000d11b0c9f74754ebdbfc544b05a258.
+//
+// Solidity: event Paused(address account)
+func (_XEvents *XEventsFilterer) FilterPaused(opts *bind.FilterOpts) (*XEventsPausedIterator, error) {
+
+	logs, sub, err := _XEvents.contract.FilterLogs(opts, "Paused")
+	if err != nil {
+		return nil, err
+	}
+	return &XEventsPausedIterator{contract: _XEvents.contract, event: "Paused", logs: logs, sub: sub}, nil
+}
+
+// WatchPaused is a free log subscription operation binding the contract event 0x62e78cea01bee320cd4e420270b5ea74000d11b0c9f74754ebdbfc544b05a258.
+//
+// Solidity: event Paused(address account)
+func (_XEvents *XEventsFilterer) WatchPaused(opts *bind.WatchOpts, sink chan<- *XEventsPaused) (event.Subscription, error) {
+
+	logs, sub, err := _XEvents.contract.WatchLogs(opts, "Paused")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(XEventsPaused)
+				if err := _XEvents.contract.UnpackLog(event, "Paused", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParsePaused is a log parse operation binding the contract event 0x62e78cea01bee320cd4e420270b5ea74000d11b0c9f74754ebdbfc544b05a258.
+//
+// Solidity: event Paused(address account)
+func (_XEvents *XEventsFilterer) ParsePaused(log types.Log) (*XEventsPaused, error) {
+	event := new(XEventsPaused)
+	if err := _XEvents.contract.UnpackLog(event, "Paused", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
 }
 
 // XEventsRoleAdminChangedIterator is returned from FilterRoleAdminChanged and is used to iterate over the raw logs and unpacked data for RoleAdminChanged events raised by the XEvents contract.
@@ -1310,6 +1563,140 @@ func (_XEvents *XEventsFilterer) WatchRoleRevoked(opts *bind.WatchOpts, sink cha
 func (_XEvents *XEventsFilterer) ParseRoleRevoked(log types.Log) (*XEventsRoleRevoked, error) {
 	event := new(XEventsRoleRevoked)
 	if err := _XEvents.contract.UnpackLog(event, "RoleRevoked", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+// XEventsUnpausedIterator is returned from FilterUnpaused and is used to iterate over the raw logs and unpacked data for Unpaused events raised by the XEvents contract.
+type XEventsUnpausedIterator struct {
+	Event *XEventsUnpaused // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  moaccore.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *XEventsUnpausedIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(XEventsUnpaused)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(XEventsUnpaused)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *XEventsUnpausedIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *XEventsUnpausedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// XEventsUnpaused represents a Unpaused event raised by the XEvents contract.
+type XEventsUnpaused struct {
+	Account common.Address
+	Raw     types.Log // Blockchain specific contextual infos
+}
+
+// FilterUnpaused is a free log retrieval operation binding the contract event 0x5db9ee0a495bf2e6ff9c91a7834c1ba4fdd244a5e8aa4e537bd38aeae4b073aa.
+//
+// Solidity: event Unpaused(address account)
+func (_XEvents *XEventsFilterer) FilterUnpaused(opts *bind.FilterOpts) (*XEventsUnpausedIterator, error) {
+
+	logs, sub, err := _XEvents.contract.FilterLogs(opts, "Unpaused")
+	if err != nil {
+		return nil, err
+	}
+	return &XEventsUnpausedIterator{contract: _XEvents.contract, event: "Unpaused", logs: logs, sub: sub}, nil
+}
+
+// WatchUnpaused is a free log subscription operation binding the contract event 0x5db9ee0a495bf2e6ff9c91a7834c1ba4fdd244a5e8aa4e537bd38aeae4b073aa.
+//
+// Solidity: event Unpaused(address account)
+func (_XEvents *XEventsFilterer) WatchUnpaused(opts *bind.WatchOpts, sink chan<- *XEventsUnpaused) (event.Subscription, error) {
+
+	logs, sub, err := _XEvents.contract.WatchLogs(opts, "Unpaused")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(XEventsUnpaused)
+				if err := _XEvents.contract.UnpackLog(event, "Unpaused", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseUnpaused is a log parse operation binding the contract event 0x5db9ee0a495bf2e6ff9c91a7834c1ba4fdd244a5e8aa4e537bd38aeae4b073aa.
+//
+// Solidity: event Unpaused(address account)
+func (_XEvents *XEventsFilterer) ParseUnpaused(log types.Log) (*XEventsUnpaused, error) {
+	event := new(XEventsUnpaused)
+	if err := _XEvents.contract.UnpackLog(event, "Unpaused", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log

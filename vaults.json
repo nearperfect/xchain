@@ -6,18 +6,14 @@
         "rpc": "http://172.21.0.11:8545",
         "ws": "ws://172.21.0.11:8546",
         "prefix": "mc",
-        "address": "0xABE1A1A941C9666ac221B041aC1cFE6167e1F1D0",
-        "gasprice": 20,
-        "blocktime": 5
+        "address": "0xABE1A1A941C9666ac221B041aC1cFE6167e1F1D0"
       },
       "vaulty": {
         "id": 95125,
         "rpc": "http://172.21.0.11:8545",
         "ws": "ws://172.21.0.11:8546",
         "prefix": "mc",
-        "address": "0xcCa8BAA2d1E83A38bdbcF52a9e5BbB530f50493A",
-        "gasprice": 20,
-        "blocktime": 5
+        "address": "0xcCa8BAA2d1E83A38bdbcF52a9e5BbB530f50493A"
       },
       "tokenmappings": [
         {
@@ -25,6 +21,42 @@
           "sourcetoken": "0x350e47237eb2515b3b30c2f232268b998e392409",
           "mappedchainid": 95125,
           "mappedtoken": "0x8553ce822a9072b5ff0992da9a61d5ce54a1f5df"
+        },
+        {
+          "sourcechainid": 95125,
+          "sourcetoken": "0x0454BC6DA193230c7c7C08c9F01Cf49f17e03aa9",
+          "mappedchainid": 95125,
+          "mappedtoken": "0x41c0f3518450b0e546671e5f61Ac50EEe61fa351"
+        }
+      ]
+    },
+    {
+      "vaultx": {
+        "id": 95125,
+        "rpc": "http://172.21.0.11:8545",
+        "ws": "ws://172.21.0.11:8546",
+        "prefix": "mc",
+        "address": "0xD493f82ec6a0C36d78c03C886134F718874088c8"
+      },
+      "vaulty": {
+        "id": 95125,
+        "rpc": "http://172.21.0.11:8545",
+        "ws": "ws://172.21.0.11:8546",
+        "prefix": "mc",
+        "address": "0x58484ce21fb2Df4BeF146e65cd96e7f8E91E998E"
+      },
+      "tokenmappings": [
+        {
+          "sourcechainid": 95125,
+          "sourcetoken": "0x350e47237eb2515b3b30c2f232268b998e392409",
+          "mappedchainid": 95125,
+          "mappedtoken": "0xDE33f85C2E655FdF9Ab833DE7779E8eD66224ee2"
+        },
+        {
+          "sourcechainid": 95125,
+          "sourcetoken": "0xfb8ce4134b4030EcBfEFd2909314D520872656e6",
+          "mappedchainid": 95125,
+          "mappedtoken": "0x1c436B435cCa513C8133DF5ED6b2CAFb460a6e04"
         }
       ]
     }

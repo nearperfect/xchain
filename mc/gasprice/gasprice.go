@@ -23,13 +23,12 @@ import (
 	"sync"
 
 	"github.com/MOACChain/MoacLib/common"
-	"github.com/MOACChain/xchain/internal/mcapi"
 	"github.com/MOACChain/MoacLib/params"
+	"github.com/MOACChain/xchain/internal/mcapi"
 	"github.com/MOACChain/xchain/rpc"
 )
 
-//Can be update
-var maxPrice = big.NewInt(500 * params.Xiao)
+var maxPrice = big.NewInt(10 * params.Xiao)
 
 type Config struct {
 	Blocks     int
