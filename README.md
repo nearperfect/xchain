@@ -138,7 +138,10 @@ grantMinter(addr)
 ---
 
 ## 4  xchain节点运行
-注意：
+
+---
+
+### 4.1 运行节点
 
 1. 节点的mine必须打开，moacbase必须设置为3.1中获得的地址
 
@@ -153,3 +156,30 @@ grantMinter(addr)
 ```bash
 ./build/bin/xchain --datadir ~/.xchain3 --mine --minerthreads 1 --rpc --rpcport 38545 --rpcaddr 0.0.0.0 --rpcapi txpool,chain3,mc,net,vnode,personal,admin,miner --port 50333 --bootnodesv4 enode://b02fff0c541506fdb9b1bc3296f8132a41b3fc5f6a5ff331f33203826b9f8275d6231ace83311c8ea34b716b9efd09c58bcca8f9a6499a3d79031fbbdb0994b3@192.168.0.156:30333
 ```
+
+---
+
+### 4.2 上传vault配置信息
+首先根据3.2节内容准备好配置文件，然后将该配置文件内容写入xchain系统合约xconfig（地址0x10000）。可以利用以下xchain自带的工具将该配置文件上链：
+```bash
+go run mcclient/script/xconfig.go http://192.168.0.156:18545 ./vaults.json
+```
+参数分别为： 1. xchain的rpc地址， 2. 配置文件地址
+
+xchain节点会定期读取xconfig合约内的配置文件内容，并相应的调整跨链操作。
+
+---
+
+# 附录一
+## xchain升级与vault合约迁移过程
+
+流程如下：
+
+1. 在X,Y链上将已有的vault合约双向全部关闭，关闭方式为调用合约的pause方法。
+2. 等待几分钟，保证现有的xchain已经处理完最后一笔转账。
+3. 停止已有的xchain链的运行，备份数据后将数据目录删除。
+4. 在X,Y链上部署新的vault合约。
+5. 在X链上，将已有vault X合约的所有锁仓转移至新的vault X合约，包括原生币与erc20币。转移方式为调用已有vault X合约的refund函数。Y链上的vault合约无需转移锁仓。
+6. 搭建一条新的xchain链，在xchain的配置文件中设置好新的vault X,Y等合约地址。
+7. 将前端页面指向新的vault合约地址
+8. Y链上的用户跨链资产不受迁移影响，迁移期间，用户可以自由使用。
