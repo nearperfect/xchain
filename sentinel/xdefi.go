@@ -328,7 +328,7 @@ func (xdefiContext *XdefiContext) InitClients() {
 	// sanity check chain id
 	xchainId_, err := xclient.ChainID(context.Background())
 	if err != nil {
-		log.Errorf("[InitClients]\t client chain id err: %v", err)
+		LogErr("[InitClients]\t client chain id err: %v", err)
 		return
 	}
 	if xChainId != xchainId_.Uint64() {
@@ -340,10 +340,10 @@ func (xdefiContext *XdefiContext) InitClients() {
 	}
 	xclientWS, err := mcclient.Dial(xChainWS)
 	if err != nil {
-		LogInfo("[InitClients] Unable to connect to network ws:%v\n", err)
-		return
+		LogErr("[InitClients] Unable to connect to network ws:%v\n", err)
+	} else {
+		xclientWS.SetFuncPrefix(xChainFuncPrefix)
 	}
-	xclientWS.SetFuncPrefix(xChainFuncPrefix)
 
 	///////////////////////////////////////////////////////////
 
@@ -356,7 +356,7 @@ func (xdefiContext *XdefiContext) InitClients() {
 	// sanity check chain id
 	ychainId_, err := yclient.ChainID(context.Background())
 	if err != nil {
-		log.Errorf("[InitClients]\t client chain id err: %v", err)
+		LogErr("[InitClients]\t client chain id err: %v", err)
 		return
 	}
 	if yChainId != ychainId_.Uint64() {
@@ -368,16 +368,16 @@ func (xdefiContext *XdefiContext) InitClients() {
 	}
 	yclientWS, err := mcclient.Dial(yChainWS)
 	if err != nil {
-		LogInfo("[InitClients] Unable to connect to network ws:%v\n", err)
-		return
+		LogErr("[InitClients] Unable to connect to network ws:%v\n", err)
+	} else {
+		yclientWS.SetFuncPrefix(yChainFuncPrefix)
 	}
-	yclientWS.SetFuncPrefix(yChainFuncPrefix)
 
 	//////////////////////////////////////////////////////////////////////////
 
 	clientXevents, err := mcclient.Dial(xdefiContext.Sentinel.Rpc)
 	if err != nil {
-		log.Errorf("[InitClients]\t client xevents err: %v %s", err, xdefiContext.Sentinel.Rpc)
+		LogErr("[InitClients]\t client xevents err: %v %s", err, xdefiContext.Sentinel.Rpc)
 		return
 	}
 
