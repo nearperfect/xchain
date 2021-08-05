@@ -252,7 +252,7 @@ func (sentinel *Sentinel) getTransactor(
 		chainId,
 	)
 	transactor.GasPrice = big.NewInt(gasPrice)
-	//transactor.GasLimit = uint64(gasLimit)
+	transactor.GasLimit = uint64(gasLimit)
 
 	//nonceAt, err := client.NonceAt(context.Background(), sentinel.key.Address, nil)
 	//sentinel.LogRpcStat("vault", "NonceAt")

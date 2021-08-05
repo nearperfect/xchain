@@ -534,18 +534,19 @@ func (xdefiContext *XdefiContext) scanVaultEvents(
 		}
 
 		currentBlock, err := clientFrom.BlockNumber(context.Background())
-		if currentBlock == lastCurrentBlock && lastCurrentBlock-lastBlock < CatchupWithinBlocks {
-			LogInfo("[scanVaultEvents]\t scan omitted: block head does NOT change on target chain")
-			continue
-		}
-		// new block from client FROM
-		lastCurrentBlock = currentBlock
-
 		if err != nil {
 			LogErr(
 				"[scanVaultEvents]\t  sentinel: unable to get current block number from chain: %v", err)
 		}
+		if currentBlock == lastCurrentBlock && lastCurrentBlock-lastBlock < CatchupWithinBlocks {
+			LogInfo("[scanVaultEvents]\t scan omitted: block head does NOT change on target chain")
+			continue
+		}
+		lastCurrentBlock = currentBlock
+
+		// set scan horizon
 		scanHorizon := currentBlock - BlockDelay
+		// if blockchain just started producing block
 		if scanHorizon < MinScanBlockNumber {
 			return nil
 		}
@@ -558,14 +559,13 @@ func (xdefiContext *XdefiContext) scanVaultEvents(
 			endBlock = lastBlock + ScanRangeDouble - 1
 		}
 
-		/*
-			if xdefiContext.ScanExists(vaultAddrFrom, lastBlock, endBlock) {
-				LogInfo("[scanVaultEvents]\t SKIP vault scan: %x, start: %d, end: %d",
-					vaultAddrFrom.Bytes(), lastBlock, endBlock,
-				)
-				lastBlock = endBlock + 1
-				continue
-			}*/
+		// sanity check lastblock and endblock
+		if endBlock > scanHorizon {
+			endBlock = scanHorizon
+		}
+		if lastBlock > endBlock {
+			lastBlock = endBlock
+		}
 
 		rawBatch := make(map[common.Hash]bool)
 		filterOpts := &bind.FilterOpts{
@@ -573,8 +573,9 @@ func (xdefiContext *XdefiContext) scanVaultEvents(
 			Start:   lastBlock,
 			End:     &endBlock,
 		}
-		LogInfo("[scanVaultEvents]\t filter opts:[batch=%d], start: %d, end: %d, cur: %d, horz: %d",
-			startBlock, lastBlock, endBlock, currentBlock, scanHorizon,
+		LogInfo(
+			"[scanVaultEvents]\t filter opts:[batch=%d], start: %d, end: %d, cur: %d, horz: %d, step: %d",
+			startBlock, lastBlock, endBlock, currentBlock, scanHorizon, endBlock-lastBlock,
 		)
 		if xdefiContext.IsDeposit() {
 			itrX, err := vaultX.FilterTokenDeposit(
@@ -634,7 +635,10 @@ func (xdefiContext *XdefiContext) scanVaultEvents(
 				sentinel.vaultEventWithSigFeed.Send(vaultEventWithSig)
 			}
 			xdefiContext.RecordVaultScan(vaultAddrFrom, lastBlock, endBlock)
-			LogInfo("[scanVaultEvents]\t filter result[batch=%d]: raw batch size = %d", lastBlock, len(rawBatch))
+			LogInfo(
+				"[scanVaultEvents]\t filter result[batch=%d, start=%d, end=%d]: raw batch size = %d",
+				startBlock, lastBlock, endBlock, len(rawBatch),
+			)
 		} else {
 			itrY, err := vaultY.FilterTokenBurn(
 				filterOpts,
@@ -693,7 +697,10 @@ func (xdefiContext *XdefiContext) scanVaultEvents(
 				sentinel.vaultEventWithSigFeed.Send(vaultEventWithSig)
 			}
 			xdefiContext.RecordVaultScan(vaultAddrFrom, lastBlock, endBlock)
-			LogInfo("[scanVaultEvents]\t filter result[batch=%d]: raw batch size = %d", lastBlock, len(rawBatch))
+			LogInfo(
+				"[scanVaultEvents]\t filter result[batch=%d, start=%d, end=%d]: raw batch size = %d",
+				startBlock, lastBlock, endBlock, len(rawBatch),
+			)
 		}
 
 		// 2 return scenarios: 1) empty or 2)with vault events
@@ -890,9 +897,9 @@ func (xdefiContext *XdefiContext) PendingVaultEventsBatch(sentinel *Sentinel) {
 	for {
 		select {
 		case err := <-subNewConfig.Err():
-			LogErr("[PendingVaultEventsBatch] new config sub err: %v", err)
+			LogErr("[PendingVaultEvents] new config sub err: %v", err)
 		case newConfigVersion := <-newConfigChan:
-			LogInfo("[PendingVaultEventsBatch] new config version received: %d -> %d",
+			LogInfo("[PendingVaultEvents] new config version received: %d -> %d",
 				xdefiContext.ConfigVersion, newConfigVersion,
 			)
 			if newConfigVersion > xdefiContext.ConfigVersion {
@@ -906,7 +913,7 @@ func (xdefiContext *XdefiContext) PendingVaultEventsBatch(sentinel *Sentinel) {
 					batch,
 				)
 				LogInfo(
-					"[PendingVaultEventsBatch]\t Before MOVE vault watermark, "+
+					"[PendingVaultEvents]\t Before MOVE vault watermark, "+
 						"batch size: %d, succeeded: %v, commit %v, errors: %v",
 					len(batch.Batch),
 					succeeded,
@@ -948,7 +955,7 @@ func (xdefiContext *XdefiContext) confirmVaultEvents(
 		// if we have new config event, don't wait for confirmation
 		if len(newConfigChan) > 0 {
 			newConfigVersion := <-newConfigChan
-			LogInfo("[PendingVaultEventsBatch] new config version received: %d -> %d",
+			LogInfo("[PendingVaultEvents] new config version received: %d -> %d",
 				xdefiContext.ConfigVersion, newConfigVersion,
 			)
 			if newConfigVersion > xdefiContext.ConfigVersion {
@@ -972,7 +979,7 @@ func (xdefiContext *XdefiContext) confirmVaultEvents(
 				batch.Vault,
 				big.NewInt(int64(batch.End)),
 			)
-			LogInfo("[PendingVaultEventsBatch]\t MOVE vault watermark HIGHER to %d, err: %v",
+			LogInfo("[PendingVaultEvents]\t MOVE vault watermark HIGHER to %d, err: %v",
 				batch.End, err,
 			)
 			return nil
@@ -981,7 +988,7 @@ func (xdefiContext *XdefiContext) confirmVaultEvents(
 		// wait time out
 		if blockNumberAfter-blockNumberBefore > BatchCommitThreshold {
 			LogErr(
-				"[PendingVaultEventsBatch]\t batch commit wait threshold time out: block [%d -> %d]",
+				"[PendingVaultEvents]\t batch commit wait threshold time out: xchain block [%d -> %d]",
 				blockNumberBefore, blockNumberAfter,
 			)
 			break
@@ -1087,13 +1094,15 @@ func (xdefiContext *XdefiContext) forwardVaultEvents(
 		}
 		rlp.DecodeBytes(vaultEventData.EventData, &vaultEvent)
 		LogInfo(
-			"[ForwardVaultEvents]\t Vault [TO] TO MINT/WITHDRAW: nonce: %d "+
-				"amount: %d, tip: %d, to: %x, mappedToken: %x",
+			"[ForwardVaultEvents]\t Vault [TO] MINT/WITHDRAW tx: nonce: %d "+
+				"amount: %d, tip: %d, to: %x, mappedToken: %x, txtor.GasLimit: %d, txtor.Nonce: %d",
 			big.NewInt(waterMark.Int64()+i),
 			vaultEvent.Amount,
 			vaultEvent.Tip,
 			vaultEvent.To.Bytes()[:8],
 			vaultEvent.MappedToken.Bytes()[:8],
+			transactor.GasLimit,
+			transactor.Nonce,
 		)
 		// if no more vault event
 		if vaultEvent.Amount == nil || vaultEvent.Amount.Int64() == 0 {
@@ -1318,7 +1327,7 @@ func (xdefiContext *XdefiContext) commitVaultEvents(
 		return []uint64{}, []uint64{}, []uint64{}, nil
 	}
 	LogInfo(
-		"[commitVaultEvents]\t   %x, balance: %d, nonce: %d",
+		"[commitVaultEvents]\t %x, balance: %d, account nonce: %d",
 		sentinel.key.Address.Bytes(), balance, nonceAt,
 	)
 	//  if we don't have money, return
