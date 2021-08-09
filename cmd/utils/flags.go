@@ -28,6 +28,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/nakabonne/gosivy/agent"
 	"gopkg.in/urfave/cli.v1"
 
 	"github.com/MOACChain/MoacLib/common"
@@ -247,6 +248,10 @@ var (
 		Name:  "txpool.lifetime",
 		Usage: "Maximum amount of time non-executable transaction are queued",
 		Value: mc.DefaultConfig.TxPool.Lifetime,
+	}
+	GosivyFlag = cli.BoolFlag{
+		Name:  "gosivy",
+		Usage: "Turn on gosivy stats",
 	}
 	// Performance tuning settings
 	CacheFlag = cli.IntFlag{
@@ -562,6 +567,14 @@ func setBootstrapNodes(ctx *cli.Context, cfg *p2p.Config) {
 	}
 }
 
+func setGosivy(ctx *cli.Context) {
+	if ctx.GlobalIsSet(GosivyFlag.Name) {
+		if err := agent.Listen(agent.Options{}); err != nil {
+			panic(err)
+		}
+	}
+}
+
 func setSubnetBootstrapNodes(ctx *cli.Context, cfg *p2p.Config) {
 	urls := params.SubnetBootnodes
 	if ctx.GlobalIsSet(SubnetBootnodesFlag.Name) {
@@ -854,6 +867,7 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 	setHTTP(ctx, cfg)
 	setWS(ctx, cfg)
 	setNodeUserIdent(ctx, cfg)
+	setGosivy(ctx)
 
 	//Use input dir
 	switch {

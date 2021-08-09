@@ -149,8 +149,8 @@ func (sentinel *Sentinel) InitXconfig() error {
 }
 
 func (sentinel *Sentinel) ReloadConfigLoop() {
-	log.Infof("------------enter reload config loop--------------")
-	defer log.Errorf("-------exit reload config loop ---------------")
+	log.Infof("------------ Enter reload config loop--------------")
+	defer log.Errorf("------- Exit reload config loop ---------------")
 	ticker := time.NewTicker(ConfigCheckInterval * time.Second)
 	for {
 		select {
@@ -252,7 +252,7 @@ func (sentinel *Sentinel) getTransactor(
 		chainId,
 	)
 	transactor.GasPrice = big.NewInt(gasPrice)
-	//transactor.GasLimit = uint64(gasLimit)
+	transactor.GasLimit = uint64(gasLimit)
 
 	//nonceAt, err := client.NonceAt(context.Background(), sentinel.key.Address, nil)
 	//sentinel.LogRpcStat("vault", "NonceAt")
@@ -440,6 +440,7 @@ func (sentinel *Sentinel) startWatchersAndForwarders() {
 				// forward vault events from xchain to target chain
 				for _, tokenMapping := range vaultPairConfig.TokenMappings {
 					go xdefiContextXY.ForwardVaultEvents(sentinel, tokenMapping)
+					go xdefiContextXY.VaultScanStatus(sentinel, tokenMapping)
 				}
 
 				// burn & withdarw
@@ -469,6 +470,7 @@ func (sentinel *Sentinel) startWatchersAndForwarders() {
 				// forward vault events from xchain to target chain
 				for _, tokenMapping := range vaultPairConfig.TokenMappings {
 					go xdefiContextYX.ForwardVaultEvents(sentinel, tokenMapping)
+					go xdefiContextXY.VaultScanStatus(sentinel, tokenMapping)
 				}
 
 				//////////////////////////////////////////////////////////////////////

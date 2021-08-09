@@ -1143,6 +1143,16 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(hash common.Hash) (map[
 		tmpStatus = 1
 	}
 
+	var newLogs []interface{}
+	if receipt.Logs != nil {
+		newLogs = make([]interface{}, len(receipt.Logs))
+		for i, _ := range receipt.Logs {
+			lnew := new(types.LogNew)
+			types.ConvertLog(receipt.Logs[i], lnew)
+			newLogs[i] = lnew
+		}
+	}
+
 	fields := map[string]interface{}{
 		"status":            hexutil.Uint(tmpStatus),
 		"blockHash":         blockHash,
@@ -1154,7 +1164,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(hash common.Hash) (map[
 		"gasUsed":           (*hexutil.Big)(receipt.GasUsed),
 		"cumulativeGasUsed": (*hexutil.Big)(receipt.CumulativeGasUsed),
 		"contractAddress":   nil,
-		"logs":              receipt.Logs,
+		"logs":              newLogs,
 		"logsBloom":         receipt.Bloom,
 	}
 	if receipt.Logs == nil {

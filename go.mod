@@ -1,9 +1,9 @@
 module github.com/MOACChain/xchain
 
-go 1.16
+go 1.14
 
 require (
-	github.com/MOACChain/MoacLib v1.0.1001
+	github.com/MOACChain/MoacLib v1.0.1002
 	github.com/beevik/ntp v0.3.0
 	github.com/cespare/cp v1.1.1
 	github.com/davecgh/go-spew v1.1.1
@@ -21,6 +21,7 @@ require (
 	github.com/maruel/panicparse v1.6.1 // indirect
 	github.com/mattn/go-colorable v0.1.8
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
+	github.com/nakabonne/gosivy v0.2.0 // indirect
 	github.com/naoina/go-stringutil v0.1.0 // indirect
 	github.com/naoina/toml v0.1.1
 	github.com/nsf/termbox-go v1.1.1 // indirect
@@ -53,4 +54,5 @@ require (
 
 //replace github.com/innowells/bls_lib/v2 => /media/yifan/ssd/go/src/github.com/innowells/bls_lib
 //replace github.com/MOACChain/MoacLib => /media/yifan/ssd/go/src/github.com/MOACChain/MoacLib
-
+replace github.com/innowells/bls_lib/v2 => /home/yifan/projects/bls_lib
+replace github.com/MOACChain/MoacLib => /home/yifan/projects/MoacLib

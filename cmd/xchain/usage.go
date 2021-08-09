@@ -192,14 +192,6 @@ var AppHelpFlagGroups = []flagGroup{
 		Name:  "VNODE SERVICE",
 		Flags: vnodeConfigFlags,
 	},
-	// Removed for MOAC project
-	// {
-	// 	Name: "DEPRECATED",
-	// 	Flags: []cli.Flag{
-	// 		utils.FastSyncFlag,
-	// 		utils.LightModeFlag,
-	// 	},
-	// },
 	{
 		Name: "MISC",
 	},

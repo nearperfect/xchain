@@ -48,9 +48,23 @@ func (vaultEvent *VaultEvent) Hash() common.Hash {
 	return common.RlpHash(vaultEvent)
 }
 
-func (vaultEvent *VaultEvent) TokenMapping() string {
+func TokenMappingString(
+	sourceChainid *big.Int,
+	sourceToken []byte,
+	mappedChainid *big.Int,
+	mappedToken []byte,
+) string {
 	return fmt.Sprintf(
 		"%d,%x,%d,%x",
+		sourceChainid,
+		sourceToken,
+		mappedChainid,
+		mappedToken,
+	)
+}
+
+func (vaultEvent *VaultEvent) TokenMapping() string {
+	return TokenMappingString(
 		vaultEvent.SourceChainid,
 		vaultEvent.SourceToken.Bytes(),
 		vaultEvent.MappedChainid,
@@ -58,13 +72,17 @@ func (vaultEvent *VaultEvent) TokenMapping() string {
 	)
 }
 
-func (vaultEvent *VaultEvent) TokenMappingSha256() [32]byte {
+func TokenMappingSha256(tokenMappingString string) [32]byte {
 	h := sha256.New()
-	h.Write([]byte(vaultEvent.TokenMapping()))
+	h.Write([]byte(tokenMappingString))
 	sha := h.Sum(nil)
 	var sha32 [32]byte
 	copy(sha32[:], sha)
 	return sha32
+}
+
+func (vaultEvent *VaultEvent) TokenMappingSha256() [32]byte {
+	return TokenMappingSha256(vaultEvent.TokenMapping())
 }
 
 func (vaultEvent *VaultEvent) TokenMappingWithVault() string {

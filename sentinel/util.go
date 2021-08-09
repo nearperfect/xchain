@@ -18,10 +18,7 @@ package sentinel
 
 import (
 	"fmt"
-)
-
-const (
-	MaxUint64 = uint64(18446744073709551615)
+	"math"
 )
 
 func Max(input []uint64) (uint64, error) {
@@ -38,7 +35,7 @@ func Max(input []uint64) (uint64, error) {
 }
 
 func Min(input []uint64) (uint64, error) {
-	min := MaxUint64
+	min := uint64(math.MaxUint64)
 	if len(input) == 0 {
 		return min, fmt.Errorf("Empty input array")
 	}

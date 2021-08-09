@@ -608,8 +608,8 @@ func (dkg *DKG) NewVnodeBlockLoop() {
 			currentVnodeBlockNumber, _ := dkg.client.BlockNumber(context.Background())
 			log.Infof("----------- New vnode block number = %d ----------------", currentVnodeBlockNumber)
 			if currentVnodeBlockNumber > lastBlock {
-				SlowNodeChan <- currentVnodeBlockNumber
-				RevealedShareChan <- currentVnodeBlockNumber
+				//SlowNodeChan <- currentVnodeBlockNumber
+				//RevealedShareChan <- currentVnodeBlockNumber
 				UploadVSSConfigChan <- currentVnodeBlockNumber
 				VssStateChan <- currentVnodeBlockNumber
 

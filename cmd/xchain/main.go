@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"gopkg.in/urfave/cli.v1"
 	_ "net/http/pprof"
 
 	"github.com/MOACChain/MoacLib/common"
@@ -40,7 +41,6 @@ import (
 	"github.com/MOACChain/xchain/mcclient"
 	"github.com/MOACChain/xchain/node"
 	"github.com/MOACChain/xchain/params"
-	"gopkg.in/urfave/cli.v1"
 )
 
 const (
@@ -112,6 +112,7 @@ var (
 		utils.GpoBlocksFlag,
 		utils.GpoPercentileFlag,
 		utils.ExtraDataFlag,
+		utils.GosivyFlag,
 		configFileFlag,
 	}
 
@@ -201,6 +202,8 @@ func init() {
 //Start the main node with correct version number
 func main() {
 	log.Infof("Start MOAC %s ...", params.VersionWithName)
+
+	// main process
 	if err := app.Run(os.Args); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
