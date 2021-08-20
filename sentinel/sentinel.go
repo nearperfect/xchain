@@ -429,18 +429,6 @@ func (sentinel *Sentinel) startWatchersAndForwarders() {
 					sentinel.configVersion,
 					DEPOSIT,
 				)
-				// 3 steps to record vault events in xchain
-				// 1) scan vault in source chain
-				// 2) queue: wait for enough sigs
-				// 3) pending: commit to xchain
-				go xdefiContextXY.ScanVaultEvents(sentinel)
-				go xdefiContextXY.QueueVaultEventsBatch(sentinel)
-				go xdefiContextXY.PendingVaultEventsBatch(sentinel)
-
-				// forward vault events from xchain to target chain
-				for _, tokenMapping := range vaultPairConfig.TokenMappings {
-					go xdefiContextXY.ForwardVaultEvents(sentinel, tokenMapping)
-				}
 
 				// burn & withdarw
 				xdefiContextYX := sentinel.prepareCommonContext(
@@ -458,23 +446,43 @@ func (sentinel *Sentinel) startWatchersAndForwarders() {
 					BURN,
 				)
 
-				// 3steps to record vault events in xchain
-				// 1) scan vault in source chain
-				// 2) queue: wait for enough sigs
-				// 3) pending: commit to xchain
-				go xdefiContextYX.ScanVaultEvents(sentinel)
-				go xdefiContextYX.QueueVaultEventsBatch(sentinel)
-				go xdefiContextYX.PendingVaultEventsBatch(sentinel)
+				if xdefiContextXY != nil && xdefiContextYX != nil {
+					// 3 steps to record vault events in xchain
+					// 1) scan vault in source chain
+					// 2) queue: wait for enough sigs
+					// 3) pending: commit to xchain
+					go xdefiContextXY.ScanVaultEvents(sentinel)
+					go xdefiContextXY.QueueVaultEventsBatch(sentinel)
+					go xdefiContextXY.PendingVaultEventsBatch(sentinel)
 
-				// forward vault events from xchain to target chain
-				for _, tokenMapping := range vaultPairConfig.TokenMappings {
-					go xdefiContextYX.ForwardVaultEvents(sentinel, tokenMapping)
+					// forward vault events from xchain to target chain
+					for _, tokenMapping := range vaultPairConfig.TokenMappings {
+						go xdefiContextXY.ForwardVaultEvents(sentinel, tokenMapping)
+					}
+
+					////////////////////////////////////////////////////////
+					////////////////////////////////////////////////////////
+					// 3steps to record vault events in xchain
+					// 1) scan vault in source chain
+					// 2) queue: wait for enough sigs
+					// 3) pending: commit to xchain
+					go xdefiContextYX.ScanVaultEvents(sentinel)
+					go xdefiContextYX.QueueVaultEventsBatch(sentinel)
+					go xdefiContextYX.PendingVaultEventsBatch(sentinel)
+
+					// forward vault events from xchain to target chain
+					for _, tokenMapping := range vaultPairConfig.TokenMappings {
+						go xdefiContextYX.ForwardVaultEvents(sentinel, tokenMapping)
+					}
 				}
 
 				//////////////////////////////////////////////////////////////////////
 				//////////////////////////////////////////////////////////////////////
 				// sanity check
-				if !(xdefiContextXY.EventType == DEPOSIT && xdefiContextYX.EventType == BURN) {
+				if xdefiContextXY != nil &&
+					xdefiContextYX != nil &&
+					!(xdefiContextXY.EventType == DEPOSIT &&
+						xdefiContextYX.EventType == BURN) {
 					panic("Missing Deposit or Burn go routine")
 				}
 
