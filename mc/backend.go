@@ -40,6 +40,7 @@ import (
 	"github.com/MOACChain/xchain/consensus/ethash"
 	"github.com/MOACChain/xchain/core"
 	"github.com/MOACChain/xchain/core/bloombits"
+	"github.com/MOACChain/xchain/dkg"
 	"github.com/MOACChain/xchain/event"
 	"github.com/MOACChain/xchain/internal/mcapi"
 	"github.com/MOACChain/xchain/mc/downloader"
@@ -51,7 +52,6 @@ import (
 	vnodeParams "github.com/MOACChain/xchain/params"
 	"github.com/MOACChain/xchain/rpc"
 	"github.com/MOACChain/xchain/sentinel"
-	"github.com/MOACChain/xchain/vnode"
 )
 
 // Add a instance of MoacService handling SCS
@@ -71,7 +71,6 @@ type MoacService struct {
 	txPool          *core.TxPool
 	blockchain      *core.BlockChain
 	ProtocolManager *ProtocolManager
-	scsHandler      *vnode.VnodeServer
 
 	// DB interfaces
 	chainDb        mcdb.Database // Block chain database
@@ -90,6 +89,9 @@ type MoacService struct {
 
 	//sentinel, monitor events from target chains
 	sentinel *sentinel.Sentinel
+
+	// dkg, for distributed key generation and bls
+	dkg *dkg.DKG
 }
 
 func GetInstance() *MoacService {
@@ -106,11 +108,6 @@ func New(ctx *node.ServiceContext, config *Config) (*MoacService, error) {
 		return nil, fmt.Errorf("invalid sync mode %d", config.SyncMode)
 	}
 	chainDb, err := CreateDB(ctx, config, "chaindata")
-	if err != nil {
-		return nil, err
-	}
-
-	syncDb, err := CreateSyncDB(ctx, config, "syncdata")
 	if err != nil {
 		return nil, err
 	}
@@ -151,12 +148,12 @@ func New(ctx *node.ServiceContext, config *Config) (*MoacService, error) {
 
 	vmConfig := vm.Config{EnablePreimageRecording: config.EnablePreimageRecording}
 
-	mcSrv.blockchain, err = core.NewBlockChain(chainDb, mcSrv.chainConfig, mcSrv.engine, vmConfig)
+	mcSrv.blockchain, err = core.NewBlockChain(
+		chainDb, mcSrv.chainConfig, mcSrv.engine, vmConfig, mcSrv.config.VnodeConfig,
+	)
 	if err != nil {
 		return nil, err
 	}
-	//add by frank
-	mcSrv.scsHandler = vnode.NewScsService(chainDb, syncDb, mcSrv.blockchain, mcSrv, ctx)
 
 	// Rewind the chain in case of an incompatible config upgrade.
 	if compat, ok := genesisErr.(*params.ConfigCompatError); ok {
@@ -173,8 +170,12 @@ func New(ctx *node.ServiceContext, config *Config) (*MoacService, error) {
 	// txpool
 	mcSrv.txPool = core.NewTxPool(config.TxPool, mcSrv.chainConfig, mcSrv.blockchain)
 
+	// dkg
+	mcSrv.dkg = dkg.New(config.VnodeConfig, config.XchainId, config.XchainKey)
+	log.Infof("DKG ********** %v", mcSrv.dkg)
+
 	// sentinel for vault
-	mcSrv.sentinel = sentinel.New(mcSrv.BlockChain())
+	mcSrv.sentinel = sentinel.New(mcSrv.BlockChain(), mcSrv.config.VaultsConfig, chainDb, mcSrv.dkg)
 
 	log.Debugf("create new protocol manager")
 	if mcSrv.ProtocolManager, err = NewProtocolManager(
@@ -184,14 +185,15 @@ func New(ctx *node.ServiceContext, config *Config) (*MoacService, error) {
 		mcSrv.eventMux,
 		mcSrv.txPool,
 		mcSrv.sentinel,
+		mcSrv.dkg,
 		mcSrv.engine,
 		mcSrv.blockchain,
 		chainDb,
-		mcSrv.scsHandler); err != nil {
+	); err != nil {
 		return nil, err
 	}
 
-	mcSrv.miner = miner.New(mcSrv, mcSrv.chainConfig, mcSrv.EventMux(), mcSrv.engine, mcSrv.ProtocolManager.NetworkRelay)
+	mcSrv.miner = miner.New(mcSrv, mcSrv.chainConfig, mcSrv.EventMux(), mcSrv.engine)
 	mcSrv.miner.SetExtra(makeExtraData(config.ExtraData))
 
 	mcSrv.ApiBackend = &MoacApiBackend{mcSrv, nil}
@@ -337,11 +339,6 @@ func (s *MoacService) APIs() []rpc.API {
 			Version:   "1.0",
 			Service:   s.netRPCService,
 			Public:    true,
-		}, {
-			Namespace: "vnode",
-			Version:   "1.0",
-			Service:   s.scsHandler,
-			Public:    true,
 		},
 	}...)
 }
@@ -456,7 +453,6 @@ func (s *MoacService) Stop() error {
 	s.eventMux.Stop()
 
 	s.chainDb.Close()
-	s.scsHandler.Close()
 	log.Info("MOAC NODE shutting down....")
 	close(s.shutdownChan)
 

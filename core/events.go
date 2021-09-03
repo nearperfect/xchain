@@ -17,8 +17,12 @@
 package core
 
 import (
+	"fmt"
+	"math/big"
+
 	"github.com/MOACChain/MoacLib/common"
 	"github.com/MOACChain/MoacLib/types"
+	"github.com/MOACChain/xchain/dkg"
 )
 
 // TxPreEvent is posted when a transaction enters the transaction pool.
@@ -37,6 +41,9 @@ type PendingStateEvent struct{}
 
 // NewMinedBlockEvent is posted when a block has been imported.
 type NewMinedBlockEvent struct{ Block *types.Block }
+
+// NewSigShareEvent is
+type NewSigShareEvent struct{ SigShare *dkg.SigShareMessage }
 
 // RemovedTransactionEvent is posted when a reorg happens
 type RemovedTransactionEvent struct{ Txs types.Transactions }
@@ -58,17 +65,33 @@ type ChainHeadEvent struct{ Block *types.Block }
 
 type TxShardJoinEvent struct{ Tx *types.Transaction }
 
+type SigShares []*dkg.SigShareMessage
+
 type VaultEvents []*VaultEvent
 
 type VaultEvent struct {
-	SourceToken common.Address
-	MappedToken common.Address
-	To          common.Address
-	Amount      uint64
-	Nonce       uint64
-	Data        []byte
+	SourceChainid *big.Int       `json:"sourcechainid"  gencodec:"required"`
+	SourceToken   common.Address `json:"sourcetoken"    gencodec:"required"`
+	MappedChainid *big.Int       `json:"mappedchainid"  gencodec:"required"`
+	MappedToken   common.Address `json:"mappedtoken"    gencodec:"required"`
+	To            common.Address `json:"to"             gencodec:"required"`
+	Amount        *big.Int       `json:"amount"         gencodec:"required"`
+	Nonce         *big.Int       `json:"nonce"          gencodec:"required"`
+	Data          []byte         `json:"data"           gencodec:"required"`
 }
 
 func (vaultEvent *VaultEvent) Hash() common.Hash {
 	return common.RlpHash(vaultEvent)
+}
+
+func (vaultEvent *VaultEvent) String() string {
+	return fmt.Sprintf(
+		"source[%s]: %x, mapped[%s]: %x, account: %x, amount: %s",
+		vaultEvent.SourceChainid,
+		vaultEvent.SourceToken.Bytes()[:8],
+		vaultEvent.MappedToken,
+		vaultEvent.MappedToken.Bytes()[:8],
+		vaultEvent.To.Bytes()[:8],
+		vaultEvent.Amount,
+	)
 }

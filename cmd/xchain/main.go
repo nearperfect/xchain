@@ -40,7 +40,6 @@ import (
 	"github.com/MOACChain/xchain/mcclient"
 	"github.com/MOACChain/xchain/node"
 	"github.com/MOACChain/xchain/params"
-	"github.com/MOACChain/xchain/vnode"
 	"gopkg.in/urfave/cli.v1"
 )
 
@@ -131,7 +130,11 @@ var (
 	}
 
 	vnodeConfigFlags = []cli.Flag{
-		utils.VnodeConfig,
+		utils.VnodeConfigFlag,
+	}
+
+	vaultsConfigFlags = []cli.Flag{
+		utils.VaultsConfigFlag,
 	}
 )
 
@@ -174,6 +177,7 @@ func init() {
 	app.Flags = append(app.Flags, debug.Flags...)
 	//Add custom flags
 	app.Flags = append(app.Flags, vnodeConfigFlags...)
+	app.Flags = append(app.Flags, vaultsConfigFlags...)
 
 	app.Before = func(ctx *cli.Context) error {
 		runtime.GOMAXPROCS(runtime.NumCPU())
@@ -208,12 +212,6 @@ func main() {
 // It creates a default node based on the command line arguments and runs it in
 // blocking mode, waiting for it to be shut down.
 func moac(ctx *cli.Context) error {
-	configFilePath := ctx.GlobalString(utils.VnodeConfig.Name)
-	log.Infof("vnode file %v", configFilePath)
-
-	// Start the VNODE service with SCS
-	go vnode.VnodeServiceStart(configFilePath)
-
 	// Load the VNODE config
 	go initLog(ctx)
 	log.Debugf("[cmd/moac/main.go->moac] about to call makeFullNode ctx")

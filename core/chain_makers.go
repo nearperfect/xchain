@@ -27,6 +27,7 @@ import (
 	"github.com/MOACChain/MoacLib/types"
 	"github.com/MOACChain/MoacLib/vm"
 	"github.com/MOACChain/xchain/consensus/ethash"
+	"github.com/MOACChain/xchain/vnode/config"
 )
 
 // So we can deterministically seed different blockchains
@@ -85,8 +86,7 @@ func (b *BlockGen) AddTx(tx *types.Transaction) {
 	b.statedb.Prepare(tx.Hash(), common.Hash{}, len(b.txs))
 
 	//Added the networkRelay info in the Transaction
-	nr := Nr
-	receipt, _, err := ApplyTransaction(b.config, nil, &b.header.Coinbase, b.gasPool, b.statedb, b.header, tx, b.header.GasUsed, vm.Config{}, nil, nr)
+	receipt, _, err := ApplyTransaction(b.config, nil, &b.header.Coinbase, b.gasPool, b.statedb, b.header, tx, b.header.GasUsed, vm.Config{}, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -228,7 +228,7 @@ func newCanonical(n int, full bool) (mcdb.Database, *BlockChain, error) {
 	db, _ := mcdb.NewMemDatabase()
 	genesis := gspec.MustCommit(db)
 
-	blockchain, _ := NewBlockChain(db, params.AllProtocolChanges, ethash.NewFaker(), vm.Config{})
+	blockchain, _ := NewBlockChain(db, params.AllProtocolChanges, ethash.NewFaker(), vm.Config{}, &config.Configuration{})
 	// Create and inject the requested chain
 	if n == 0 {
 		return db, blockchain, nil

@@ -67,12 +67,12 @@ type Miner struct {
 	shouldStart int32 // should start indicates whether we should start after sync
 }
 
-func New(mc Backend, config *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, nr NetworkRelay) *Miner {
+func New(mc Backend, config *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine) *Miner {
 	miner := &Miner{
 		mc:       mc,
 		mux:      mux,
 		engine:   engine,
-		worker:   newWorker(config, engine, common.Address{}, mc, mux, nr),
+		worker:   newWorker(config, engine, common.Address{}, mc, mux),
 		canStart: 1,
 	}
 	miner.Register(NewCpuAgent(mc.BlockChain(), engine))

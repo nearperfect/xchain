@@ -70,7 +70,7 @@ func NewStateProcessor(config *params.ChainConfig, bc *BlockChain, engine consen
 // Process returns the receipts and logs accumulated during the process and
 // returns the amount of gasRemaining that was used in the process. If any of the
 // transactions failed to execute due to insufficient gasRemaining it will return an error.
-func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg vm.Config, nr vm.NetworkRelayInterface, liveFlag bool) (types.Receipts, []*types.Log, *big.Int, error) {
+func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg vm.Config, liveFlag bool) (types.Receipts, []*types.Log, *big.Int, error) {
 	log.Debugf("[core/state_processor.go->Process]")
 	var (
 		receipts     types.Receipts
@@ -96,7 +96,18 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	// Iterate over and process the individual transactions
 	for i, tx := range txs {
 		statedb.Prepare(tx.Hash(), block.Hash(), i)
-		receipt, _, err := ApplyTransaction(p.config, p.bc, nil, gp, statedb, header, tx, totalUsedGas, cfg, nil, nr)
+		receipt, _, err := ApplyTransaction(
+			p.config,
+			p.bc,
+			nil,
+			gp,
+			statedb,
+			header,
+			tx,
+			totalUsedGas,
+			cfg,
+			nil,
+		)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -123,7 +134,6 @@ func ApplyTransaction(
 	usedGas *big.Int,
 	cfg vm.Config,
 	txpool *TxPool,
-	nr vm.NetworkRelayInterface,
 ) (*types.Receipt, *big.Int, error) {
 	msg, err := tx.AsMessage(types.MakeSigner(config, header.Number))
 	if msg.To() != nil {
@@ -143,7 +153,7 @@ func ApplyTransaction(
 	context := NewEVMContext(msg, header, bc, author, txpool)
 	// Create a new environment which holds all relevant information
 	// about the transaction and calling mechanisms.
-	vmenv := vm.NewEVM(context, statedb, config, cfg, nr)
+	vmenv := vm.NewEVM(context, statedb, config, cfg, nil)
 	// Apply the transaction to the current state (included in the env)
 
 	_, gas, failed, err := ApplyMessage(vmenv, msg, gp)
@@ -196,7 +206,6 @@ func ApplyTransactionForCalculateGas(
 	usedGas *big.Int,
 	cfg vm.Config,
 	txpool *TxPool,
-	nr vm.NetworkRelayInterface,
 ) (*types.Receipt, *big.Int, error) {
 	msg, err := tx.AsMessage(types.MakeSigner(config, header.Number))
 	if msg.To() != nil {
@@ -216,7 +225,7 @@ func ApplyTransactionForCalculateGas(
 	context := NewEVMContext(msg, header, bc, author, txpool)
 	// Create a new environment which holds all relevant information
 	// about the transaction and calling mechanisms.
-	vmenv := vm.NewEVM(context, statedb, config, cfg, nr)
+	vmenv := vm.NewEVM(context, statedb, config, cfg, nil)
 	// Apply the transaction to the current state (included in the env)
 
 	_, gas, failed, err := ApplyMessageForCalculateGas(vmenv, msg, gp)
