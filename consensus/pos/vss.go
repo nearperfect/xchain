@@ -393,7 +393,7 @@ func (pos *Pos) ValidateBLSSig(
 
 func (pos *Pos) HandleSigShares() {
 	// blockhash -> nodexindex -> sigshare
-	var allSigShares = make(map[string]map[int64][]byte)
+	var allSigShares = make(map[string]map[int][]byte)
 
 	for {
 		sigShare := <-pos.Vss.SigShareChan
@@ -401,9 +401,9 @@ func (pos *Pos) HandleSigShares() {
 		log.Debugf("---------------- receive sigShare: hash: %x, key: %s", sigShare.Hash().Bytes()[:8], sigShare.Key())
 
 		if _, ok := allSigShares[sigShareKey]; !ok {
-			allSigShares[sigShareKey] = make(map[int64][]byte)
+			allSigShares[sigShareKey] = make(map[int][]byte)
 		}
-		allSigShares[sigShareKey][sigShare.FromIndex.Int64()] = sigShare.Sig
+		allSigShares[sigShareKey][sigShare.FromIndex] = sigShare.Sig
 
 		/*
 			// update each node's height

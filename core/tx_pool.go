@@ -627,11 +627,6 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 		return ErrClassicTxNotEnabled
 	}
 
-	// Check other fields in classic txs are not modified
-	if tx.IsClassic() && (tx.ShardingFlag() != 0 || tx.Via() != nil || tx.SystemFlag() != 0) {
-		return ErrClassicTxFields
-	}
-
 	// Enforce chain id limitation
 	if tx.ChainId().Cmp(params.MaxChainId) >= 0 {
 		return ErrMaximumChainId
@@ -656,7 +651,7 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 		}
 	}
 	// Ensure the transaction adheres to nonce ordering
-	if tx.SystemFlag() > 0 && tx.Nonce() == 0 {
+	if tx.Nonce() == 0 {
 		tx.UpdateNonce(pool.currentState.GetNonce(from))
 	}
 	if pool.currentState.GetNonce(from) > tx.Nonce() {
@@ -670,13 +665,11 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	}
 
 	//ignore system contract
-	if tx.SystemFlag() == 0 {
-
-		intrGas := IntrinsicGas(tx.Data(), tx.To() == nil, pool.pangu)
-		if tx.GasLimit().Cmp(intrGas) < 0 {
-			return ErrIntrinsicGas
-		}
+	intrGas := IntrinsicGas(tx.Data(), tx.To() == nil, pool.pangu)
+	if tx.GasLimit().Cmp(intrGas) < 0 {
+		return ErrIntrinsicGas
 	}
+
 	return nil
 }
 
