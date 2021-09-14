@@ -208,3 +208,33 @@ function grantMinter(address minter) public onlyAdmin returns (bool)
 9. 将前端页面指向新的vault合约地址
 10. Y链上的用户跨链资产不受迁移影响，迁移期间，用户可以自由使用。
 
+# 附录二
+## Genesis alloc 更新过程
+
+流程如下:
+
+    更新genesis.json文件后，使用mkalloc工具，产生binary码
+    go run core/mkalloc.go genesis.json
+    编辑genesis_alloc.go文件
+    emacs core/genesis_alloc.go
+
+# 附录三
+
+xchainRescue工具用于重置xchain的区块扫描信息至某个高度
+
+参数：
+    xchain rpc地址
+    跨链方向，x2y, y2x
+    vault合约地址
+    重置高度
+
+示例：
+./xchainRescue http://127.0.0.1:18545 x2y 0xa7eb59c3074fe608419796ae2eb73bae3f576079 600000
+
+xchainStatus工具用于查看当前xchain的区块扫描信息与vault合约信息
+
+参数：
+    xchain rpc地址
+
+示例：
+./xchainStatus http://127.0.0.1:18545

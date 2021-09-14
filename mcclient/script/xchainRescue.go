@@ -18,7 +18,7 @@ import (
 /////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////
 //
-// To run: ./xchainRescue http://127.0.0.1:18545 xy 0xa7eb59c3074fe608419796ae2eb73bae3f576079 600000
+// To run: ./xchainRescue http://127.0.0.1:18545 x2y 0xa7eb59c3074fe608419796ae2eb73bae3f576079 600000
 //
 
 func main() {
@@ -54,10 +54,12 @@ func main() {
 
 	// initialize xconfig vault contract
 	var xeventsAddr common.Address
-	if direction == "xy" {
+	if direction == "x2y" {
 		xeventsAddr = common.HexToAddress("0x0000000000000000000000000000000000010001")
-	} else {
+	} else if direction == "y2x" {
 		xeventsAddr = common.HexToAddress("0x0000000000000000000000000000000000010002")
+	} else {
+		log.Printf("Direction \"%s\" not known. Use either \"x2y\" or \"y2x\"", direction)
 	}
 
 	xeventsContract, err := xevents.NewXEvents(

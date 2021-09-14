@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -86,12 +87,21 @@ func main() {
 			vaultXAddr,
 			clientX,
 		)
-		/*
-			clientY, err := mcclient.Dial(vaultConfig.VaultY.ChainRPC)
-			vaultYContract, _ := vaulty.NewVaultY(
-				vaultYAddr,
-				clientY,
-			)*/
+		clientY, err := mcclient.Dial(vaultConfig.VaultY.ChainRPC)
+		clientY.SetFuncPrefix("eth")
+		/*vaultYContract, _ := vaulty.NewVaultY(
+			vaultYAddr,
+			clientY,
+		)*/
+
+		currentBlockX, errx := clientX.BlockNumber(context.Background())
+		currentBlockY, erry := clientY.BlockNumber(context.Background())
+		if errx != nil {
+			fmt.Printf("errx %v", errx)
+		}
+		if erry != nil {
+			fmt.Printf("erry %v", erry)
+		}
 
 		fmt.Printf(
 			"\nVault Pair X <-> Y (%x -> %x) # %d:\n",
@@ -136,8 +146,8 @@ func main() {
 			fmt.Printf("\tvault X scan err: %v\n", err)
 		} else {
 			fmt.Printf(
-				"\tvault X scan block: %d (chain id:%d)\n",
-				watermarkX, vaultConfig.VaultX.ChainId,
+				"\tvault X scan block: %d (chain id:%d, #%d)\n",
+				watermarkX, vaultConfig.VaultX.ChainId, currentBlockX,
 			)
 		}
 
@@ -146,8 +156,9 @@ func main() {
 		if err != nil {
 			fmt.Printf("\tvault Y scan err: %v\n", err)
 		} else {
-			fmt.Printf("\tvault Y scan block: %d (chain id:%d)\n",
-				watermarkY, vaultConfig.VaultY.ChainId,
+			fmt.Printf(
+				"\tvault Y scan block: %d (chain id:%d, #%d)\n",
+				watermarkY, vaultConfig.VaultY.ChainId, currentBlockY,
 			)
 		}
 	}
