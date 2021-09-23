@@ -19,7 +19,11 @@ import (
 /////////////////////////////////////////////////////////////////////////////////////
 //
 // To run: ./xchainRescue http://127.0.0.1:18545 x2y 0xa7eb59c3074fe608419796ae2eb73bae3f576079 600000
-//
+// parameters:
+//     1. rpc address
+//     2. which vault: x2y for vault x, y2x for vault y
+//     3. specify vault address
+//     4. reset height
 
 func main() {
 	// read config file

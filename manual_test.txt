@@ -1,0 +1,36 @@
+1. START BLOCKCHAIN NODES
+
+docker container stop $(docker container ls -aq) ; docker container rm -f $(docker container ls -aq) ; docker volume rm $(docker volume ls -q)
+
+docker build -t yifan:vaultx-dev -f docker/vaultx.dockerfile --build-arg version=dev . && docker-compose -f docker/docker-compose-vaultx.yaml up -t 20
+
+
+2. INJECT TXS INTO VAULTS
+
+make migrationx
+
+
+3. START XCHAIN NODES
+
+rm -rf ~/.xchain1/moac;rm -rf ~/.xchain2/moac;rm -rf ~/.xchain3/moac;
+
+./build/bin/xchain --datadir ~/.xchain1 --moacbase 0x40ca9bdd3e744a9d5bc5b78808741926d1864a8a --port 51000 --mine --minerthreads 1 --rpc --rpcport 51001 --rpcaddr 0.0.0.0 --rpcapi txpool,chain3,mc,net,vnode,personal,admin,miner 2>&1 | tee xchain1.log
+
+./build/bin/xchain --datadir ~/.xchain2 --moacbase 0x7d3ea2daa415738ea34c32fcdc1eb30bddfa4dcb --port 52000 --mine --minerthreads 1 --rpc --rpcport 52001 --rpcaddr 0.0.0.0 --rpcapi txpool,chain3,mc,net,vnode,personal,admin,miner --bootnodesv4 enode://71f593c583a388e44d6ae1f2ac1b2eb7ece8906e7884dd0f3bd1421bc01165d77a957eb7d6358cee5834b67006355f245225de1b5ba46ffac15baaa4644dc4a3@127.0.0.1:51000 2>&1 | tee xchain2.log
+
+./build/bin/xchain --datadir ~/.xchain3 --moacbase 0xde75e1d5b49e08ae5d841a026cfc420b95b89d4b --port 53000 --mine --minerthreads 1 --rpc --rpcport 53001 --rpcaddr 0.0.0.0 --rpcapi txpool,chain3,mc,net,vnode,personal,admin,miner --bootnodesv4 enode://71f593c583a388e44d6ae1f2ac1b2eb7ece8906e7884dd0f3bd1421bc01165d77a957eb7d6358cee5834b67006355f245225de1b5ba46ffac15baaa4644dc4a3@127.0.0.1:51000 2>&1 | tee xchain3.log
+
+
+4. UPLOAD CONFIG
+
+go run mcclient/script/xconfig.go http://127.0.0.1:51001 ./vaults.json
+
+
+5. SHOW XCHAIN STATUS
+
+go run mcclient/script/xchainStatus.go http://127.0.0.1:51001
+
+
+6. RESET VAULT SCAN HEIGHT
+// use xchainStatus to check for vault address and current scan height
+go run mcclient/script/xchainRescue.go http://127.0.0.1:51001 x2y 0xa7eb59c3074fe608419796ae2eb73bae3f576079 600000

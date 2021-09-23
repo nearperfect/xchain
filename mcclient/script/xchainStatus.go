@@ -104,7 +104,7 @@ func main() {
 		}
 
 		fmt.Printf(
-			"\nVault Pair X <-> Y (%x -> %x) # %d:\n",
+			"\nVault Pair X <-> Y (vault %x -> vault %x) # %d:\n",
 			vaultXAddr.Bytes()[:3], vaultYAddr.Bytes()[:3],
 			index,
 		)
@@ -124,7 +124,9 @@ func main() {
 			depositNonce, _ := vaultXContract.TokenMappingDepositNonce(
 				callOpts, sourceToken, mappedToken,
 			)
-			fmt.Printf("\tX deposit nonce: %d\n", depositNonce)
+			fmt.Printf("\n")
+			fmt.Printf("\tToken mapping: %x <-> %x\n", sourceToken.Bytes()[:3], mappedToken.Bytes()[:3])
+			fmt.Printf("\t\tX deposit nonce: %d\n", depositNonce)
 
 			/*
 				// burn nonce
@@ -135,11 +137,11 @@ func main() {
 			*/
 
 			res, _ := xeventsXY.TokenMappingWatermark(callOpts, vaultXAddr, sha256)
-			fmt.Printf("\tX -> Y nonce: %d\n", res)
+			fmt.Printf("\t\tX -> Y nonce: %d\n", res)
 			res, _ = xeventsYX.TokenMappingWatermark(callOpts, vaultYAddr, sha256)
-			fmt.Printf("\tY -> X nonce: %d\n", res)
+			fmt.Printf("\t\tY -> X nonce: %d\n", res)
 		}
-
+		fmt.Printf("\n")
 		watermarkX, err := xeventsXY.VaultWatermark(callOpts, vaultXAddr)
 
 		if err != nil {
