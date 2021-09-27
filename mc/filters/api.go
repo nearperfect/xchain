@@ -27,8 +27,8 @@ import (
 
 	"github.com/MOACChain/MoacLib/common"
 	"github.com/MOACChain/MoacLib/common/hexutil"
-	"github.com/MOACChain/MoacLib/types"
 	"github.com/MOACChain/MoacLib/mcdb"
+	"github.com/MOACChain/MoacLib/types"
 	"github.com/MOACChain/xchain/event"
 	"github.com/MOACChain/xchain/rpc"
 )
@@ -322,7 +322,7 @@ func (api *PublicFilterAPI) NewFilter(crit FilterCriteria) (rpc.ID, error) {
 // GetLogs returns logs matching the given argument that are stored within the state.
 //
 // https://github.com/moaccore/wiki/wiki/JSON-RPC#eth_getlogs
-func (api *PublicFilterAPI) GetLogs(ctx context.Context, crit FilterCriteria) ([]*types.LogNew, error) {
+func (api *PublicFilterAPI) GetLogs(ctx context.Context, crit FilterCriteria) ([]*types.Log, error) {
 	// Convert the RPC block numbers into internal representations
 	if crit.FromBlock == nil {
 		crit.FromBlock = big.NewInt(rpc.LatestBlockNumber.Int64())
@@ -361,7 +361,7 @@ func (api *PublicFilterAPI) UninstallFilter(id rpc.ID) bool {
 // If the filter could not be found an empty array of logs is returned.
 //
 // https://github.com/moaccore/wiki/wiki/JSON-RPC#eth_getfilterlogs
-func (api *PublicFilterAPI) GetFilterLogs(ctx context.Context, id rpc.ID) ([]*types.LogNew, error) {
+func (api *PublicFilterAPI) GetFilterLogs(ctx context.Context, id rpc.ID) ([]*types.Log, error) {
 	api.filtersMu.Lock()
 	f, found := api.filters[id]
 	api.filtersMu.Unlock()
@@ -433,19 +433,11 @@ func returnHashes(hashes []common.Hash) []common.Hash {
 
 // returnLogs is a helper that will return an empty log array in case the given logs array is nil,
 // otherwise the given logs array is returned.
-func returnLogs(logs []*types.Log) []*types.LogNew {
+func returnLogs(logs []*types.Log) []*types.Log {
 	if logs == nil {
-		return []*types.LogNew{}
-	} else {
-		newLogs := make([]*types.LogNew, len(logs))
-		for i, _ := range logs {
-			newLogs[i] = new(types.LogNew)
-			if logs[i] != nil {
-				types.ConvertLog(logs[i], newLogs[i])
-			}
-		}
-		return newLogs
+		return []*types.Log{}
 	}
+	return logs
 }
 
 // UnmarshalJSON sets *args fields with given data.

@@ -613,7 +613,6 @@ func (xdefiContext *XdefiContext) VaultEventsChunkGenerator(
 			}
 			eventByTotalNonce[totalNonce] = vaultEvent
 		}
-
 		// slice vault events into chunks
 		for nonce := begin; nonce <= end; {
 			vaultEventsChunk := make([]VaultEvent, 0)
@@ -709,7 +708,8 @@ func (xdefiContext *XdefiContext) scanVaultEvents(
 			End:     &endBlock,
 		}
 		LogInfo(
-			"[1.1 scanVaultEvents]\t filter opts:[batch=%d], start: %d, end: %d, cur: %d, horz: %d, step: %d",
+			"[1.1 scanVaultEvents]\t filter opts:[batch=%d], "+
+				"start: %d, end: %d, cur: %d, horz: %d, step: %d",
 			startBlock, lastBlock, endBlock, currentBlock, scanHorizon, endBlock-lastBlock,
 		)
 
@@ -755,13 +755,12 @@ func (xdefiContext *XdefiContext) scanVaultEvents(
 					blssig,
 				}
 				LogInfo(
-					"[1.1 scanVaultEvents]\t Scanned vault X event  ******: %x, nonce: %d, "+
-						"block: %d, source: %x, mapped: %x",
-					vaultAddrFrom.Bytes()[:4],
-					event.Nonce,
-					event.BlockNumber,
+					"[1.1 scanVaultEvents]\t Scanned vault X event: "+
+						"source: %x, mapped: %x, nocne: %d, block: %d",
 					event.SourceToken.Bytes()[:4],
 					event.MappedToken.Bytes()[:4],
+					event.Nonce,
+					event.BlockNumber,
 				)
 				// process the event in this sentinel, include this node itself.
 				vaultEventHash := sentinel.ProcessVaultEventWithSig(&vaultEventWithSig)
@@ -769,6 +768,9 @@ func (xdefiContext *XdefiContext) scanVaultEvents(
 
 				// broad cast to other nodes
 				sentinel.vaultEventWithSigFeed.Send(vaultEventWithSig)
+			}
+			if err := itrX.Error(); err != nil {
+				LogErr("[1.1 scanVaultEvents]\t iterator X error: %s", err)
 			}
 			xdefiContext.RecordVaultScan(vaultAddrFrom, lastBlock, endBlock)
 			LogInfo(
@@ -817,20 +819,23 @@ func (xdefiContext *XdefiContext) scanVaultEvents(
 					blssig,
 				}
 				LogInfo(
-					"[1.1 scanVaultEvents]\t Scanned vault Y event ******: %x, nonce: %d, "+
-						"block: %d, source: %x, mapped: %x",
-					vaultAddrFrom.Bytes()[:4],
-					event.Nonce,
-					event.BlockNumber,
+					"[1.1 scanVaultEvents]\t Scanned vault Y event: "+
+						"source: %x, mapped: %x, nocne: %d, block: %d",
 					event.SourceToken.Bytes()[:4],
 					event.MappedToken.Bytes()[:4],
+					event.Nonce,
+					event.BlockNumber,
 				)
+
 				// process the event in this sentinel, include this node itself.
 				vaultEventHash := sentinel.ProcessVaultEventWithSig(&vaultEventWithSig)
 				rawBatch[vaultEventHash] = true
 
 				// broad cast to other nodes
 				sentinel.vaultEventWithSigFeed.Send(vaultEventWithSig)
+			}
+			if err := itrY.Error(); err != nil {
+				LogErr("[1.1 scanVaultEvents]\t iterator Y error: %s", err)
 			}
 			xdefiContext.RecordVaultScan(vaultAddrFrom, lastBlock, endBlock)
 			LogInfo(
@@ -948,7 +953,7 @@ func (xdefiContext *XdefiContext) QueueVaultEventsBatch(sentinel *Sentinel) {
 	LogInfo := xdefiContext.LogInfo()
 	LogErr := xdefiContext.LogErr()
 	worker := "QueueVaultEventsBatch"
-	LogInfo("-------------------Enter queue vault events loop-------------------")
+	LogInfo("------------------- Enter queue vault events loop -------------------")
 	sentinel.addWorker(worker)
 	defer LogInfo("QueueVaultEventsBatch loop exit")
 	defer sentinel.reduceWorker(worker)
@@ -1390,10 +1395,10 @@ func (xdefiContext *XdefiContext) PrepareTokenMint(
 	sentinel *Sentinel, tokenMapping TokenMapping,
 ) {
 	LogInfo := xdefiContext.LogInfo()
-	LogInfo("------------------Enter prepare token mint loop ------------------")
+	LogInfo("------------------ Enter prepare token mint loop ------------------")
 	worker := "PrepareTokenMint"
 	sentinel.addWorker(worker)
-	defer LogInfo("--------------------Exit prepare token mint loop --------------------")
+	defer LogInfo("-------------------- Exit prepare token mint loop --------------------")
 	defer sentinel.reduceWorker(worker)
 
 	ticker := time.NewTicker(VaultCheckInterval * time.Second)
@@ -1505,7 +1510,7 @@ func (xdefiContext *XdefiContext) RejectTokenMint(
 	sentinel *Sentinel, tokenMapping TokenMapping,
 ) {
 	LogInfo := xdefiContext.LogInfo()
-	LogInfo("------------------Enter reject token mint loop ------------------")
+	LogInfo("------------------- Enter reject token mint loop ------------------")
 	worker := "RejectTokenMint"
 	sentinel.addWorker(worker)
 	defer LogInfo("--------------------Exit reject token mint loop --------------------")
@@ -1585,7 +1590,7 @@ func (xdefiContext *XdefiContext) CommitTokenMint(
 	sentinel *Sentinel, tokenMapping TokenMapping,
 ) {
 	LogInfo := xdefiContext.LogInfo()
-	LogInfo("------------------Enter commit token mint loop ------------------")
+	LogInfo("------------------- Enter commit token mint loop ------------------")
 	worker := "CommitTokenMint"
 	sentinel.addWorker(worker)
 	defer LogInfo("--------------------Exit commit token mint loop --------------------")
