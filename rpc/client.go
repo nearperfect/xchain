@@ -33,7 +33,6 @@ import (
 	"time"
 
 	"github.com/MOACChain/MoacLib/log"
-	"github.com/MOACChain/MoacLib/types"
 )
 
 var (
@@ -285,47 +284,7 @@ func (c *Client) CallContext(ctx context.Context, result interface{}, method str
 	case len(resp.Result) == 0:
 		return ErrNoResult
 	default:
-		err := json.Unmarshal(resp.Result, &result)
-		if fmt.Sprintf("%s", err) == "missing required field 'TxData' for Log" {
-			resultLogs := *result.(*[]types.Log)
-			var resultNew []types.LogNew
-			errNew := json.Unmarshal(resp.Result, &resultNew)
-			if errNew != nil {
-				return errNew
-			} else {
-				count := 0
-				for index, _ := range resultLogs {
-					resultLogs[index].Address = resultNew[index].Address
-					resultLogs[index].Topics = resultNew[index].Topics
-					resultLogs[index].Data = resultNew[index].Data
-					resultLogs[index].BlockNumber = resultNew[index].BlockNumber
-					resultLogs[index].TxHash = resultNew[index].TxHash
-					resultLogs[index].TxIndex = resultNew[index].TxIndex
-					resultLogs[index].BlockHash = resultNew[index].BlockHash
-					resultLogs[index].Index = resultNew[index].Index
-					resultLogs[index].Removed = resultNew[index].Removed
-					count += 1
-				}
-
-				for index := count; index < len(resultNew); index++ {
-					var l types.Log
-					lNew := resultNew[index]
-					l.Address = lNew.Address
-					l.Topics = lNew.Topics
-					l.Data = lNew.Data
-					l.BlockNumber = lNew.BlockNumber
-					l.TxHash = lNew.TxHash
-					l.TxIndex = lNew.TxIndex
-					l.BlockHash = lNew.BlockHash
-					l.Index = lNew.Index
-					l.Removed = lNew.Removed
-					resultLogs = append(resultLogs, l)
-				}
-
-				return nil
-			}
-		}
-		return err
+		return json.Unmarshal(resp.Result, &result)
 	}
 }
 
