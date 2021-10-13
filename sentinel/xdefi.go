@@ -53,7 +53,7 @@ const (
 	MaxBlockNumber                    = uint64(1000000000000)
 	Gwei                              = int64(1000000000)
 	DefaultGasPrice                   = int64(20) * Gwei
-	DefaultGasLimit                   = int64(300000)
+	DefaultGasLimit                   = int64(6000000)
 	BlockDelay                        = 12
 	MaxEmptyBatchBlocks               = 60
 	MintBatchSize                     = 30
@@ -913,7 +913,7 @@ func (xdefiContext *XdefiContext) PendingVaultEventsBatch(sentinel *Sentinel) {
 					batch,
 				)
 				LogInfo(
-					"[PendingVaultEvents]\t Before MOVE vault watermark, "+
+					"[PendingVaultEvents]\t Before move vault watermark, "+
 						"batch size: %d, succeeded: %v, commit %v, errors: %v",
 					len(batch.Batch),
 					succeeded,
