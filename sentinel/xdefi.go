@@ -75,10 +75,10 @@ const (
 )
 
 var (
-	XConfigAddr     = common.HexToAddress("0x0000000000000000000000000000000000010000")
-	XeventsXYAddr   = common.HexToAddress("0x0000000000000000000000000000000000010001")
-	XeventsYXAddr   = common.HexToAddress("0x0000000000000000000000000000000000010002")
-	tokenMintsTypes = []byte("{\"components\": [{\"internalType\": \"address\",\"name\": \"sourceToken\",\"type\": \"address\"},{\"internalType\": \"address\",\"name\": \"mappedToken\",\"type\": \"address\"},{\"internalType\": \"address payable\",\"name\": \"to\",\"type\": \"address\"},{\"internalType\": \"uint256\",\"name\": \"amount\",\"type\": \"uint256\"},{\"internalType\": \"uint256\",\"name\": \"tipX\",\"type\": \"uint256\"},{\"internalType\": \"uint256\",\"name\": \"mintNonce\",\"type\": \"uint256\"}],\"internalType\": \"struct VaultY.tokenMint[]\",\"name\": \"tokenMints\",\"type\": \"tuple[]\"}")
+	XConfigAddr   = common.HexToAddress("0x0000000000000000000000000000000000010000")
+	XeventsXYAddr = common.HexToAddress("0x0000000000000000000000000000000000010001")
+	XeventsYXAddr = common.HexToAddress("0x0000000000000000000000000000000000010002")
+	tokenMintType = []byte("{\"components\": [{\"internalType\": \"address\",\"name\": \"sourceToken\",\"type\": \"address\"},{\"internalType\": \"address\",\"name\": \"mappedToken\",\"type\": \"address\"},{\"internalType\": \"address payable\",\"name\": \"to\",\"type\": \"address\"},{\"internalType\": \"uint256\",\"name\": \"amount\",\"type\": \"uint256\"},{\"internalType\": \"uint256\",\"name\": \"tipX\",\"type\": \"uint256\"},{\"internalType\": \"uint256\",\"name\": \"mintNonce\",\"type\": \"uint256\"}],\"internalType\": \"struct VaultY.tokenMint\",\"name\":\"_tokenMint\",\"type\":\"tuple\"}")
 )
 
 type XdefiVaultEvent struct {
@@ -515,6 +515,7 @@ func (xdefiContext *XdefiContext) VaultScanStatus(sentinel *Sentinel, tokenMappi
 	LogInfo("------------------- Enter Vault Scan Status loop -------------------")
 	defer LogErr("------------------- Exit Vault Scan Status loop -------------------")
 	ticker := time.NewTicker(VaultScanStatusInterval * time.Second)
+	lastCall := time.Now().Add(-time.Hour)
 	for {
 		select {
 		case newConfigVersion := <-newConfigChan:
@@ -525,6 +526,10 @@ func (xdefiContext *XdefiContext) VaultScanStatus(sentinel *Sentinel, tokenMappi
 				return
 			}
 		case <-ticker.C:
+			if time.Now().After(lastCall.Add(VaultScanStatusInterval * time.Second)) {
+				continue
+			}
+
 			callOpts := &bind.CallOpts{}
 			vaultXAddr := xdefiContext.Config.VaultXAddr
 			vaultYAddr := xdefiContext.Config.VaultYAddr
@@ -576,6 +581,8 @@ func (xdefiContext *XdefiContext) VaultScanStatus(sentinel *Sentinel, tokenMappi
 					watermark,
 				)
 			}
+
+			lastCall = time.Now()
 		}
 	}
 }
@@ -620,10 +627,8 @@ func (xdefiContext *XdefiContext) VaultEventsChunkGenerator(
 				vaultEventsChunk = append(vaultEventsChunk, eventByTotalNonce[nonce])
 				nonce++
 			}
-
 			ch <- vaultEventsChunk
 		}
-
 		close(ch)
 	}(ch, itr)
 
@@ -670,7 +675,9 @@ func (xdefiContext *XdefiContext) scanVaultEvents(
 		currentBlock, err := clientFrom.BlockNumber(context.Background())
 		if err != nil {
 			LogErr(
-				"[1.1 scanVaultEvents]\t  sentinel: unable to get current block number from chain: %v", err)
+				"[1.1 scanVaultEvents]\t  sentinel: unable to get current block number from chain: %v",
+				err,
+			)
 		}
 		if currentBlock == lastCurrentBlock && lastCurrentBlock-lastBlock < CatchupWithinBlocks {
 			LogInfo("[1.1 scanVaultEvents]\t scan omitted: block head does NOT change on target chain")
@@ -851,8 +858,10 @@ func (xdefiContext *XdefiContext) scanVaultEvents(
 			// because all previous filters returns empty results and
 			// this filter returns empty result as well
 			if endBlock-startBlock >= MaxEmptyBatchBlocks {
-				LogInfo("[1.1 scanVaultEvents]\t max empty batch blocks reached, startBlock: %d, endBlock %d",
-					startBlock, endBlock,
+				LogInfo(
+					"[1.1 scanVaultEvents]\t max empty batch blocks reached, startBlock: %d, endBlock %d",
+					startBlock,
+					endBlock,
 				)
 				return &VaultEventsBatch{
 					rawBatch,
@@ -866,7 +875,7 @@ func (xdefiContext *XdefiContext) scanVaultEvents(
 			// this round is done, just return the batch
 			if sentinel.batchNumber != 0 {
 				LogInfo(
-					"[1.1 scanVaultEvents]\t New batch mined (commit = %t), "+
+					"[1.1 scanVaultEvents]\t New batch mined (myturn = %t), "+
 						"number: %d, start: %d, end: %d, events: %d",
 					sentinel.myTurn(MyTurnSeed),
 					sentinel.batchNumber,
@@ -909,6 +918,7 @@ func (xdefiContext *XdefiContext) ScanVaultEvents(sentinel *Sentinel) {
 	defer subNewConfig.Unsubscribe()
 	defer close(newConfigChan)
 
+	lastCall := time.Now().Add(-time.Hour)
 	for {
 		select {
 		case err := <-subCommittedBatch.Err():
@@ -929,6 +939,10 @@ func (xdefiContext *XdefiContext) ScanVaultEvents(sentinel *Sentinel) {
 				return
 			}
 		case <-ticker.C:
+			if time.Now().After(lastCall.Add(VaultCheckInterval * time.Second)) {
+				continue
+			}
+
 			if len(newConfigChan) > 0 {
 				newConfigVersion := <-newConfigChan
 				LogInfo("[1.1 scanVaultEvents]\t new config version received: %d -> %d",
@@ -938,13 +952,14 @@ func (xdefiContext *XdefiContext) ScanVaultEvents(sentinel *Sentinel) {
 					return
 				}
 			}
+
 			batch := xdefiContext.scanVaultEvents(sentinel, newConfigChan)
-			if batch == nil {
-				continue
+			if batch != nil {
+				// send to vault events batch queue
+				xdefiContext.QueueVaultEventsBatchChan <- batch
 			}
 
-			// send to vault events batch queue
-			xdefiContext.QueueVaultEventsBatchChan <- batch
+			lastCall = time.Now()
 		}
 	}
 }
@@ -1096,6 +1111,7 @@ func (xdefiContext *XdefiContext) confirmVaultEvents(
 	if err != nil {
 		return err
 	}
+
 	for {
 		// if we have new config event, don't wait for confirmation
 		if len(newConfigChan) > 0 {
@@ -1133,8 +1149,8 @@ func (xdefiContext *XdefiContext) confirmVaultEvents(
 		// wait time out
 		if blockNumberAfter-blockNumberBefore > BatchCommitThreshold {
 			LogErr(
-				"[1.3 PendingEvents]\t batch commit wait threshold time out: block [%d -> %d]",
-				blockNumberBefore, blockNumberAfter,
+				"[1.3 PendingEvents]\t batch commit wait threshold time out: block [%d -> %d], succeed: %d, batch: %d",
+				blockNumberBefore, blockNumberAfter, len(succeeded), len(batch.Batch),
 			)
 			break
 		}
@@ -1143,7 +1159,7 @@ func (xdefiContext *XdefiContext) confirmVaultEvents(
 	return fmt.Errorf("time out waiting for vault watermark commit")
 }
 
-func (xdefiContext *XdefiContext) prepareTokenMint(
+func (xdefiContext *XdefiContext) commitTokenMints(
 	sentinel *Sentinel,
 	tokenMapping TokenMapping,
 	newConfigChan chan uint64,
@@ -1167,7 +1183,7 @@ func (xdefiContext *XdefiContext) prepareTokenMint(
 		)
 		sentinel.LogRpcStat("vault", "TokenMappingWatermark")
 		if err != nil {
-			LogErr("[2.1 PrepareTokenMint]\t Vault TO: watermark err: %v", err)
+			LogErr("[2.1 CommitTokenMint]\t Vault TO: watermark err: %v", err)
 			return
 		}
 	} else {
@@ -1178,15 +1194,15 @@ func (xdefiContext *XdefiContext) prepareTokenMint(
 		)
 		sentinel.LogRpcStat("vault", "TokenMappingWatermark")
 		if err != nil {
-			LogErr("[2.1 PrepareTokenMint]\t Vault TO: watermark err: %v", err)
+			LogErr("[2.1 CommitTokenMint]\t Vault TO: watermark err: %v", err)
 			return
 		}
 	}
 
-	LogInfo("[2.1 PrepareTokenMint]\t Vault TO: watermark: %d, %s, %s",
+	LogInfo("[2.1 CommitTokenMint]\t Vault TO: watermark: %d, %x, %x",
 		waterMark,
-		tokenMapping.SourceToken,
-		tokenMapping.MappedToken,
+		tokenMapping.SourceToken[:10],
+		tokenMapping.MappedToken[:10],
 	)
 
 	////////////////////////////////////////////////////////////////
@@ -1194,10 +1210,10 @@ func (xdefiContext *XdefiContext) prepareTokenMint(
 
 	// each node will mint for n blocks, then hand it over to next node
 	if !sentinel.myTurn(MyTurnSeed) {
-		LogInfo("[2.1 PrepareTokenMint]\t Vault TO: Not My Turn to Mint")
+		LogInfo("[2.1 CommitTokenMint]\t Not My Turn to Mint")
 		return
 	} else {
-		LogInfo("[2.1 PrepareTokenMint]\t Vault TO: My Turn to Mint")
+		LogInfo("[2.1 CommitTokenMint]\t My Turn to Mint")
 	}
 
 	// setup transactor
@@ -1218,7 +1234,7 @@ func (xdefiContext *XdefiContext) prepareTokenMint(
 	//  if we don't have money, return
 	if balance.Uint64() == 0 {
 		LogErr(
-			"[2.1 PrepareTokenMint]\t No balance for account on Vault TO chain: %x",
+			"[2.1 CommitTokenMint]\t No balance for account on Vault TO chain: %x",
 			sentinel.key.Address,
 		)
 		return
@@ -1226,6 +1242,7 @@ func (xdefiContext *XdefiContext) prepareTokenMint(
 
 	committed := uint64(0)
 	errors := uint64(0)
+	// query vaultEvents, starting with [watermark + 0,1,2,3,4]
 	for i := int64(0); i < int64(MintBatchSize); i++ {
 		var vaultEvent VaultEvent
 		vaultEventData, err := xevents.VaultEvents(
@@ -1235,18 +1252,18 @@ func (xdefiContext *XdefiContext) prepareTokenMint(
 		)
 		sentinel.LogRpcStat("xevents", "VaultEvents")
 		if err != nil {
-			LogErr("[2.1 PrepareTokenMint]\t  Xevents: retrieve vault events err: %v", err)
+			LogErr("[2.1 CommitTokenMint]\t Xevents: retrieve vault events err: %v", err)
 		}
 		rlp.DecodeBytes(vaultEventData.EventData, &vaultEvent)
 		LogInfo(
-			"[2.1 PrepareTokenMint]\t Vault [TO] MINT/WITHDRAW tx: nonce: %d "+
+			"[2.1 CommitTokenMint]\t tx: nonce: %d "+
 				"amount: %d, tip: %d, to: %x, mappedToken: %x, "+
 				"transactor.GasLimit: %d, transactor.Nonce: %d",
-			big.NewInt(waterMark.Int64()+i),
+			vaultEvent.Nonce,
 			vaultEvent.Amount,
 			vaultEvent.Tip,
-			vaultEvent.To.Bytes()[:8],
-			vaultEvent.MappedToken.Bytes()[:8],
+			vaultEvent.To.Bytes()[:4],
+			vaultEvent.MappedToken.Bytes()[:4],
 			transactor.GasLimit,
 			transactor.Nonce,
 		)
@@ -1269,13 +1286,14 @@ func (xdefiContext *XdefiContext) prepareTokenMint(
 				}
 
 				// call prepare mint with hash and sig
-				hash32, signature := xdefiContext.PackTokenMintsData(
+				hashes, sigs := xdefiContext.PackTokenMintData(
 					tokenMints, sentinel,
 				)
-				tx, err = xdefiContext.VaultY.PrepareMint(
+				//tokenMints := []vaulty.VaultYtokenMint{tokenMint}
+				tx, err = xdefiContext.VaultY.PrepareMints(
 					transactor,
-					hash32,
-					signature,
+					hashes,
+					sigs,
 				)
 				sentinel.LogRpcStat("vault", "PrepareMint")
 			} else {
@@ -1293,10 +1311,10 @@ func (xdefiContext *XdefiContext) prepareTokenMint(
 
 			if err != nil {
 				errors += 1
-				log.Errorf("[2.1 PrepareTokenMint]\t sentinel vault TO 'mint' tx err: %v", err)
+				log.Errorf("[2.1 CommitTokenMint]\t sentinel vault TO 'mint' tx err: %v", err)
 			} else {
 				LogInfo(
-					"[2.1 PrepareTokenMint]\t sentinel vault [TO] mint() tx: %x, "+
+					"[2.1 CommitTokenMint]\t sentinel vault [TO] mint() tx: %x, "+
 						"from: %x, nonce: %d, %d, %d       ",
 					tx.Hash(),
 					sentinel.key.Address.Bytes(),
@@ -1316,7 +1334,7 @@ func (xdefiContext *XdefiContext) prepareTokenMint(
 	wait := 0
 	for {
 		if committed == 0 {
-			LogInfo("[2.1 PrepareTokenMint]\t No vault TO mint/withdraw tx called")
+			LogInfo("[2.1 CommitTokenMint]\t No vault TO mint/withdraw tx called")
 			break
 		}
 		var waterMark *big.Int
@@ -1335,11 +1353,11 @@ func (xdefiContext *XdefiContext) prepareTokenMint(
 		}
 		sentinel.LogRpcStat("vault", "TokenMappingWatermark")
 		LogInfo(
-			"[2.1 PrepareTokenMint]\t Vault TO: watermark: %d, before: %d, committed: %d",
+			"[2.1 CommitTokenMint]\t Vault TO: watermark: %d, before: %d, committed: %d",
 			waterMark, waterMarkBefore, committed,
 		)
 		if err != nil {
-			log.Errorf("[2.1 PrepareTokenMint]\t Err with calling vault Y watermark: %v", err)
+			log.Errorf("[2.1 CommitTokenMint]\t Err with calling vault Y watermark: %v", err)
 			continue
 		}
 
@@ -1351,7 +1369,7 @@ func (xdefiContext *XdefiContext) prepareTokenMint(
 		wait += 1
 		if wait > 20 {
 			LogInfo(
-				"[2.1 PrepareTokenMint]\t Vault Y watermark wait time out, "+
+				"[2.1 CommitTokenMint]\t Vault Y watermark wait time out, "+
 					"watermark: %d, before: %d, committed: %d",
 				waterMark, waterMarkBefore, committed,
 			)
@@ -1359,7 +1377,7 @@ func (xdefiContext *XdefiContext) prepareTokenMint(
 		}
 		if len(newConfigChan) > 0 {
 			newConfigVersion := <-newConfigChan
-			LogInfo("[2.1 PrepareTokenMint]\t new config version received: %d -> %d",
+			LogInfo("[2.1 CommitTokenMint]\t new config version received: %d -> %d",
 				xdefiContext.ConfigVersion, newConfigVersion,
 			)
 			if newConfigVersion > xdefiContext.ConfigVersion {
@@ -1372,26 +1390,31 @@ func (xdefiContext *XdefiContext) prepareTokenMint(
 }
 
 // return hash(abi.encode(tokenMints)) and its signature
-func (xdefiContext *XdefiContext) PackTokenMintsData(
+func (xdefiContext *XdefiContext) PackTokenMintData(
 	tokenMints []vaulty.VaultYtokenMint, sentinel *Sentinel,
-) ([32]byte, []byte) {
-	argument := abi.Argument{}
-	argument.UnmarshalJSON(tokenMintsTypes)
-	arguments := abi.Arguments{argument}
-	tokenMintsBytes, _ := arguments.Pack(tokenMints)
-	log.Infof("123456 %x", tokenMintsBytes)
-	hasher := sha3.NewKeccak256()
-	hasher.Write(tokenMintsBytes)
-	hash := hasher.Sum(nil)
-	var hash32 [32]byte
-	copy(hash32[:], hash)
-	log.Infof("1234567 %x", hash32)
-	sig := sentinel.dkg.Bls.SignBytes(hash)
+) ([][32]byte, [][]byte) {
+	hashes := [][32]byte{}
+	sigs := [][]byte{}
 
-	return hash32, sig
+	for _, tokenMint := range tokenMints {
+		argument := abi.Argument{}
+		argument.UnmarshalJSON(tokenMintType)
+		arguments := abi.Arguments{argument}
+		tokenMintBytes, _ := arguments.Pack(tokenMint)
+		hasher := sha3.NewKeccak256()
+		hasher.Write(tokenMintBytes)
+		hash := hasher.Sum(nil)
+		var hash32 [32]byte
+		copy(hash32[:], hash)
+		sig := sentinel.dkg.Bls.SignBytes(hash)
+		hashes = append(hashes, hash32)
+		sigs = append(sigs, sig)
+	}
+
+	return hashes, sigs
 }
 
-func (xdefiContext *XdefiContext) PrepareTokenMint(
+func (xdefiContext *XdefiContext) CommitTokenMints(
 	sentinel *Sentinel, tokenMapping TokenMapping,
 ) {
 	LogInfo := xdefiContext.LogInfo()
@@ -1407,28 +1430,34 @@ func (xdefiContext *XdefiContext) PrepareTokenMint(
 	defer sub.Unsubscribe()
 	defer close(newConfigChan)
 
+	lastCall := time.Now().Add(-time.Hour)
 	for {
 		select {
 		case <-sub.Err():
 			break
 		case newConfigVersion := <-newConfigChan:
-			LogInfo("[2.1 PrepareTokenMint]\t new config version received: %d -> %d",
+			LogInfo("[2.1 CommitTokenMint]\t new config version received: %d -> %d",
 				xdefiContext.ConfigVersion, newConfigVersion,
 			)
 			if newConfigVersion > xdefiContext.ConfigVersion {
 				return
 			}
 		case <-ticker.C:
-			xdefiContext.prepareTokenMint(
+			if time.Now().After(lastCall.Add(VaultCheckInterval * time.Second)) {
+				continue
+			}
+
+			xdefiContext.commitTokenMints(
 				sentinel,
 				tokenMapping,
 				newConfigChan,
 			)
+			lastCall = time.Now()
 		}
 	}
 }
 
-func (xdefiContext *XdefiContext) rejectTokenMint(
+func (xdefiContext *XdefiContext) rejectTokenMints(
 	sentinel *Sentinel,
 	tokenMapping TokenMapping,
 	newConfigChan chan uint64,
@@ -1454,33 +1483,37 @@ func (xdefiContext *XdefiContext) rejectTokenMint(
 		End:     &endBlock,
 	}
 
-	itrY, err := vaultY.FilterPrepareMint(
+	itrY, err := vaultY.FilterPrepareMints(
 		filterOpts,
-		[][32]byte{},
 		[]common.Address{},
 	)
 	sentinel.LogRpcStat("vault", "FilterPrepareMint")
+
+	if itrY == nil {
+		LogErr("[2.2 RejectTokenMint]\t nil iterator Y in reject token mint, err: %v", err)
+		return
+	}
 
 	for itrY.Next() {
 		event := itrY.Event
 		LogInfo(
 			"[2.2 RejectTokenMint]\t Scanned prepare mint event: toMint: %x, sig: %x, validator: %x",
-			event.ToMint,
-			event.Signature,
+			event.ToMints,
+			event.Signatures,
 			event.Validator,
 		)
 		if valid := xdefiContext.checkPrepareMint(event); !valid {
-			xdefiContext.reportPrepareMint(event, sentinel)
+			xdefiContext.validatePrepareMints(event, sentinel)
 		}
 	}
 }
 
-func (xdefiContext *XdefiContext) checkPrepareMint(event *vaulty.VaultYPrepareMint) bool {
+func (xdefiContext *XdefiContext) checkPrepareMint(event *vaulty.VaultYPrepareMints) bool {
 	return true
 }
 
-func (xdefiContext *XdefiContext) reportPrepareMint(
-	event *vaulty.VaultYPrepareMint,
+func (xdefiContext *XdefiContext) validatePrepareMints(
+	event *vaulty.VaultYPrepareMints,
 	sentinel *Sentinel,
 ) {
 	LogInfo := xdefiContext.LogInfo()
@@ -1494,8 +1527,8 @@ func (xdefiContext *XdefiContext) reportPrepareMint(
 
 	tx, err := xdefiContext.VaultY.RejectMint(
 		transactor,
-		event.ToMint,
-		event.Signature,
+		event.ToMints[0],
+		event.Signatures[0],
 		event.Validator,
 	)
 	sentinel.LogRpcStat("vault", "RejectTokenMint")
@@ -1506,7 +1539,7 @@ func (xdefiContext *XdefiContext) reportPrepareMint(
 	}
 }
 
-func (xdefiContext *XdefiContext) RejectTokenMint(
+func (xdefiContext *XdefiContext) RejectTokenMints(
 	sentinel *Sentinel, tokenMapping TokenMapping,
 ) {
 	LogInfo := xdefiContext.LogInfo()
@@ -1522,6 +1555,7 @@ func (xdefiContext *XdefiContext) RejectTokenMint(
 	defer sub.Unsubscribe()
 	defer close(newConfigChan)
 
+	lastCall := time.Now().Add(-time.Hour)
 	for {
 		select {
 		case <-sub.Err():
@@ -1534,91 +1568,16 @@ func (xdefiContext *XdefiContext) RejectTokenMint(
 				return
 			}
 		case <-ticker.C:
-			xdefiContext.rejectTokenMint(
-				sentinel,
-				tokenMapping,
-				newConfigChan,
-			)
-		}
-	}
-}
-
-func (xdefiContext *XdefiContext) commitTokenMint(
-	sentinel *Sentinel,
-	tokenMapping TokenMapping,
-	newConfigChan chan uint64,
-) {
-	tokenMints := []vaulty.VaultYtokenMint{
-		/*
-			vaulty.VaultYtokenMint{
-				vaultEvent.SourceToken,
-				vaultEvent.MappedToken,
-				vaultEvent.To,
-				vaultEvent.Amount,
-				vaultEvent.Tip,
-				vaultEvent.Nonce,
-			},*/
-	}
-	// call prepare mint with hash and sig
-	hash32, _ := xdefiContext.PackTokenMintsData(
-		tokenMints, sentinel,
-	)
-
-	LogInfo := xdefiContext.LogInfo()
-	LogErr := xdefiContext.LogErr()
-	clientY := xdefiContext.ClientY
-	transactor := sentinel.getTransactor(
-		clientY,
-		DefaultGasPrice,
-		DefaultGasLimit,
-	)
-
-	tx, err := xdefiContext.VaultY.CommitMint(
-		transactor,
-		hash32,
-		tokenMints,
-	)
-	sentinel.LogRpcStat("vault", "CommitTokenMint")
-	if err != nil {
-		LogErr("[2.3 CommitTokenMint]\t commit token mint error: %v", err)
-	} else {
-		LogInfo("[2.3 CommitTokenMint]\t commit token mint: tx: %x", tx.Hash())
-	}
-}
-
-func (xdefiContext *XdefiContext) CommitTokenMint(
-	sentinel *Sentinel, tokenMapping TokenMapping,
-) {
-	LogInfo := xdefiContext.LogInfo()
-	LogInfo("------------------- Enter commit token mint loop ------------------")
-	worker := "CommitTokenMint"
-	sentinel.addWorker(worker)
-	defer LogInfo("--------------------Exit commit token mint loop --------------------")
-	defer sentinel.reduceWorker(worker)
-
-	ticker := time.NewTicker(VaultCheckInterval * time.Second)
-	newConfigChan := make(chan uint64, 10)
-	sub := sentinel.configVersionFeed.Subscribe(newConfigChan)
-	defer sub.Unsubscribe()
-	defer close(newConfigChan)
-
-	for {
-		select {
-		case <-sub.Err():
-			break
-		case newConfigVersion := <-newConfigChan:
-			LogInfo("[2.3 CommitTokenMint]\t new config version received: %d -> %d",
-				xdefiContext.ConfigVersion, newConfigVersion,
-			)
-			if newConfigVersion > xdefiContext.ConfigVersion {
-				return
+			if time.Now().After(lastCall.Add(VaultCheckInterval * time.Second)) {
+				continue
 			}
-		case <-ticker.C:
-			xdefiContext.commitTokenMint(
+
+			xdefiContext.rejectTokenMints(
 				sentinel,
 				tokenMapping,
 				newConfigChan,
 			)
+			lastCall = time.Now()
 		}
 	}
 }

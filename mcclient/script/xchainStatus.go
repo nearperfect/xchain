@@ -13,7 +13,7 @@ import (
 	"github.com/MOACChain/xchain/mcclient"
 	"github.com/MOACChain/xchain/sentinel"
 	"github.com/MOACChain/xchain/xdefi/vaultx"
-	//"github.com/MOACChain/xchain/xdefi/vaulty"
+	"github.com/MOACChain/xchain/xdefi/vaulty"
 	"github.com/MOACChain/xchain/xdefi/xconfig"
 	"github.com/MOACChain/xchain/xdefi/xevents"
 )
@@ -89,10 +89,10 @@ func main() {
 		)
 		clientY, err := mcclient.Dial(vaultConfig.VaultY.ChainRPC)
 		clientY.SetFuncPrefix("eth")
-		/*vaultYContract, _ := vaulty.NewVaultY(
+		vaultYContract, _ := vaulty.NewVaultY(
 			vaultYAddr,
 			clientY,
-		)*/
+		)
 
 		currentBlockX, errx := clientX.BlockNumber(context.Background())
 		currentBlockY, erry := clientY.BlockNumber(context.Background())
@@ -125,16 +125,15 @@ func main() {
 				callOpts, sourceToken, mappedToken,
 			)
 			fmt.Printf("\n")
-			fmt.Printf("\tToken mapping: %x <-> %x\n", sourceToken.Bytes()[:3], mappedToken.Bytes()[:3])
+			fmt.Printf("\tToken mapping: %x <-> %x\n\n", sourceToken.Bytes()[:3], mappedToken.Bytes()[:3])
 			fmt.Printf("\t\tX deposit nonce: %d\n", depositNonce)
 
-			/*
-				// burn nonce
-				burnNonce, _ := vaultYContract.TokenMappingBurnNonce(
-					callOpts, sourceToken, mappedToken,
-				)
-				fmt.Printf("\tY burn nonce: %d\n", burnNonce)
-			*/
+			// burn nonce
+			burnNonce, _ := vaultYContract.TokenMappingBurnNonce(
+				callOpts, sourceToken, mappedToken,
+			)
+			fmt.Printf("\t\tY burn nonce: %d\n", burnNonce)
+			fmt.Printf("\n\t\t-------------\n\n")
 
 			res, _ := xeventsXY.TokenMappingWatermark(callOpts, vaultXAddr, sha256)
 			fmt.Printf("\t\tX -> Y nonce: %d\n", res)

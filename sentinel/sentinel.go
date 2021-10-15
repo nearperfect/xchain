@@ -439,9 +439,8 @@ func (sentinel *Sentinel) startWatchersAndForwarders() {
 
 				// forward vault events from xchain to target chain
 				for _, tokenMapping := range vaultPairConfig.TokenMappings {
-					go xdefiContextXY.PrepareTokenMint(sentinel, tokenMapping)
-					go xdefiContextXY.RejectTokenMint(sentinel, tokenMapping)
-					go xdefiContextXY.CommitTokenMint(sentinel, tokenMapping)
+					go xdefiContextXY.CommitTokenMints(sentinel, tokenMapping)
+					go xdefiContextXY.RejectTokenMints(sentinel, tokenMapping)
 					go xdefiContextXY.VaultScanStatus(sentinel, tokenMapping)
 				}
 
@@ -471,9 +470,8 @@ func (sentinel *Sentinel) startWatchersAndForwarders() {
 
 				// forward vault events from xchain to target chain
 				for _, tokenMapping := range vaultPairConfig.TokenMappings {
-					go xdefiContextYX.PrepareTokenMint(sentinel, tokenMapping)
-					go xdefiContextYX.RejectTokenMint(sentinel, tokenMapping)
-					go xdefiContextYX.CommitTokenMint(sentinel, tokenMapping)
+					go xdefiContextYX.CommitTokenMints(sentinel, tokenMapping)
+					go xdefiContextYX.RejectTokenMints(sentinel, tokenMapping)
 					go xdefiContextYX.VaultScanStatus(sentinel, tokenMapping)
 				}
 
