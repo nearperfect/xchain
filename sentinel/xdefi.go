@@ -57,7 +57,9 @@ const (
 	MaxBlockNumber                    = uint64(1000000000000)
 	Gwei                              = int64(1000000000)
 	DefaultGasPrice                   = int64(20) * Gwei
-	DefaultGasLimit                   = int64(300000)
+	DefaultGasLimit                   = int64(1000000)
+	DefaultGasPriceXchain             = int64(20) * Gwei
+	DefaultGasLimitXchain             = int64(1000000)
 	BlockDelay                        = 12
 	MaxEmptyBatchBlocks               = 60
 	MintBatchSize                     = 30
@@ -526,7 +528,7 @@ func (xdefiContext *XdefiContext) VaultScanStatus(sentinel *Sentinel, tokenMappi
 				return
 			}
 		case <-ticker.C:
-			if time.Now().After(lastCall.Add(VaultScanStatusInterval * time.Second)) {
+			if !(time.Now().After(lastCall.Add(VaultScanStatusInterval * time.Second))) {
 				continue
 			}
 
@@ -763,7 +765,7 @@ func (xdefiContext *XdefiContext) scanVaultEvents(
 				}
 				LogInfo(
 					"[1.1 scanVaultEvents]\t Scanned vault X event: "+
-						"source: %x, mapped: %x, nocne: %d, block: %d",
+						"source: %x, mapped: %x, vault nocne: %d, block: %d",
 					event.SourceToken.Bytes()[:4],
 					event.MappedToken.Bytes()[:4],
 					event.Nonce,
@@ -919,6 +921,7 @@ func (xdefiContext *XdefiContext) ScanVaultEvents(sentinel *Sentinel) {
 	defer close(newConfigChan)
 
 	lastCall := time.Now().Add(-time.Hour)
+
 	for {
 		select {
 		case err := <-subCommittedBatch.Err():
@@ -939,7 +942,7 @@ func (xdefiContext *XdefiContext) ScanVaultEvents(sentinel *Sentinel) {
 				return
 			}
 		case <-ticker.C:
-			if time.Now().After(lastCall.Add(VaultCheckInterval * time.Second)) {
+			if !(time.Now().After(lastCall.Add(VaultCheckInterval * time.Second))) {
 				continue
 			}
 
@@ -1087,7 +1090,7 @@ func (xdefiContext *XdefiContext) PendingVaultEventsBatch(sentinel *Sentinel) {
 
 				// wait for confirmation
 				if err := xdefiContext.confirmVaultEvents(
-					sentinel, newConfigChan, batch, succeeded, transactor); err == nil {
+					sentinel, newConfigChan, batch, transactor); err == nil {
 					// notify all feed subscribers
 					xdefiContext.CommittedVaultEventsBatchFeed.Send(batch)
 				}
@@ -1100,9 +1103,9 @@ func (xdefiContext *XdefiContext) confirmVaultEvents(
 	sentinel *Sentinel,
 	newConfigChan chan uint64,
 	batch *VaultEventsBatch,
-	succeeded []uint64,
 	transactor *bind.TransactOpts,
 ) error {
+	xeventsContract := xdefiContext.Xevents()
 	LogInfo := xdefiContext.LogInfo()
 	LogErr := xdefiContext.LogErr()
 
@@ -1131,25 +1134,64 @@ func (xdefiContext *XdefiContext) confirmVaultEvents(
 		if err != nil {
 			return err
 		}
+		if blockNumberAfter <= blockNumberBefore {
+			continue
+		}
 
-		// wait till one block is mined and all txs in the batch confirmed
-		if blockNumberAfter > blockNumberBefore && len(succeeded) == len(batch.Batch) {
+		// get how many events are succeeded
+		var succeeded []uint64
+		var tokenMappingWatermark map[string]uint64
+		for vaultEventHash, _ := range batch.Batch {
+			vaultEvent := sentinel.VaultEvents[vaultEventHash].Event
+			tokenMappingKey := fmt.Sprintf(
+				"%s, %s",
+				vaultEvent.Vault,
+				vaultEvent.TokenMappingSha256(),
+			)
+
+			if _, found := tokenMappingWatermark[tokenMappingKey]; !found {
+				watermark, err := xeventsContract.TokenMappingWatermark(
+					&bind.CallOpts{}, vaultEvent.Vault, vaultEvent.TokenMappingSha256(),
+				)
+				if err != nil {
+					tokenMappingWatermark[tokenMappingKey] = watermark.Uint64()
+				}
+			}
+
+			if tokenMappingWatermark[tokenMappingKey] > vaultEvent.Nonce.Uint64() {
+				succeeded = append(succeeded, vaultEvent.Nonce.Uint64())
+			}
+		}
+		LogInfo(
+			"[1.3 PendingEvents]\t checking batch: %d, succeeded: %d",
+			len(batch.Batch), len(succeeded),
+		)
+
+		// check all txs in the batch confirmed
+		if len(succeeded) == len(batch.Batch) {
 			xevents := xdefiContext.Xevents()
-			_, err := xevents.UpdateVaultWatermark(
+			tx, err := xevents.UpdateVaultWatermark(
 				transactor,
 				batch.Vault,
 				big.NewInt(int64(batch.End)),
 			)
-			LogInfo("[1.3 PendingEvents]\t MOVE vault watermark HIGHER to %d, err: %v",
-				batch.End, err,
-			)
+			if err != nil {
+				LogInfo("[1.3 PendingEvents TXs:%d]\t MOVE vault watermark HIGHER to %d, err: %v",
+					transactor.Nonce, batch.End, err,
+				)
+			} else {
+				LogInfo("[1.3 PendingEvents TXs:%d]\t MOVE vault watermark HIGHER to %d, err: %v",
+					tx.Nonce(), batch.End, err,
+				)
+			}
 			return nil
 		}
 
 		// wait time out
 		if blockNumberAfter-blockNumberBefore > BatchCommitThreshold {
 			LogErr(
-				"[1.3 PendingEvents]\t batch commit wait threshold time out: block [%d -> %d], succeed: %d, batch: %d",
+				"[1.3 PendingEvents]\t batch commit wait threshold time out: "+
+					"block [%d -> %d], succeed: %d, batch: %d",
 				blockNumberBefore, blockNumberAfter, len(succeeded), len(batch.Batch),
 			)
 			break
@@ -1219,8 +1261,8 @@ func (xdefiContext *XdefiContext) commitTokenMints(
 	// setup transactor
 	transactor := sentinel.getTransactor(
 		clientTo,
-		DefaultGasPrice,
-		DefaultGasLimit,
+		DefaultGasPriceXchain,
+		0, // force to use estimated gas
 	)
 	if transactor == nil {
 		return
@@ -1242,6 +1284,7 @@ func (xdefiContext *XdefiContext) commitTokenMints(
 
 	committed := uint64(0)
 	errors := uint64(0)
+	allHashes := make([][32]byte, 0)
 	// query vaultEvents, starting with [watermark + 0,1,2,3,4]
 	for i := int64(0); i < int64(MintBatchSize); i++ {
 		var vaultEvent VaultEvent
@@ -1257,15 +1300,12 @@ func (xdefiContext *XdefiContext) commitTokenMints(
 		rlp.DecodeBytes(vaultEventData.EventData, &vaultEvent)
 		LogInfo(
 			"[2.1 CommitTokenMint]\t tx: nonce: %d "+
-				"amount: %d, tip: %d, to: %x, mappedToken: %x, "+
-				"transactor.GasLimit: %d, transactor.Nonce: %d",
+				"amount: %d, tip: %d, to: %x, mappedToken: %x",
 			vaultEvent.Nonce,
 			vaultEvent.Amount,
 			vaultEvent.Tip,
 			vaultEvent.To.Bytes()[:4],
 			vaultEvent.MappedToken.Bytes()[:4],
-			transactor.GasLimit,
-			transactor.Nonce,
 		)
 		// if no more vault event
 		if vaultEvent.Amount == nil || vaultEvent.Amount.Int64() == 0 {
@@ -1289,7 +1329,12 @@ func (xdefiContext *XdefiContext) commitTokenMints(
 				hashes, sigs := xdefiContext.PackTokenMintData(
 					tokenMints, sentinel,
 				)
+
+				// record all the hashes we prepare mint
+				allHashes = append(allHashes, hashes...)
+
 				//tokenMints := []vaulty.VaultYtokenMint{tokenMint}
+				// 2.1 issue transaction
 				tx, err = xdefiContext.VaultY.PrepareMints(
 					transactor,
 					hashes,
@@ -1297,6 +1342,7 @@ func (xdefiContext *XdefiContext) commitTokenMints(
 				)
 				sentinel.LogRpcStat("vault", "PrepareMint")
 			} else {
+				// 2.1 issue transaction
 				tx, err = xdefiContext.VaultX.Withdraw(
 					transactor,
 					vaultEvent.SourceToken,
@@ -1311,16 +1357,20 @@ func (xdefiContext *XdefiContext) commitTokenMints(
 
 			if err != nil {
 				errors += 1
-				log.Errorf("[2.1 CommitTokenMint]\t sentinel vault TO 'mint' tx err: %v", err)
+				log.Errorf(
+					"[2.1 CommitTokenMint TXs:%d]\t sentinel vault TO 'mint' tx err: %v",
+					transactor.Nonce,
+					err,
+				)
 			} else {
 				LogInfo(
-					"[2.1 CommitTokenMint]\t sentinel vault [TO] mint() tx: %x, "+
-						"from: %x, nonce: %d, %d, %d       ",
+					"[2.1 CommitTokenMint TXs:%d]\t sentinel vault [TO] mint() tx: %x, "+
+						"from: %x, gasLrice: %d, gasLimit: %d",
+					tx.Nonce(),
 					tx.Hash(),
 					sentinel.key.Address.Bytes(),
-					tx.Nonce(),
-					transactor.GasPrice,
-					transactor.GasLimit,
+					tx.GasLimit(),
+					tx.GasPrice(),
 				)
 				committed += 1
 			}
@@ -1328,13 +1378,40 @@ func (xdefiContext *XdefiContext) commitTokenMints(
 	}
 
 	//////////////////////////////////////////////////////////////
-	///////// 3. wait for confirmation from vault Y
+	///////// 3. wait for prepare confirmation from vault Y
+	for {
+		time.Sleep(5 * time.Second)
+		prepareConfirmed := 0
+		currentBlock, _ := xdefiContext.ClientTo().BlockNumber(context.Background())
+		for _, hash := range allHashes {
+			mintBlock, _ := xdefiContext.VaultY.ToMints(callOpts, hash)
+			if mintBlock.Int64() > 0 && mintBlock.Uint64() < currentBlock-5 {
+				prepareConfirmed += 1
+			}
+		}
+		LogInfo(
+			"[2.2 CommitTokenMint]\t wait for prepare confirmation: %d/%d",
+			prepareConfirmed, len(allHashes),
+		)
+		if prepareConfirmed == len(allHashes) {
+			break
+		}
+	}
+
+	//////////////////////////////////////////////////////////////
+	///////// 4. commit token mints
+	LogInfo(
+		"[2.3 CommitTokenMint]\t commit token mints",
+	)
+
+	//////////////////////////////////////////////////////////////
+	///////// 5. wait for commit confirmation from vault Y
 	waterMarkBefore := waterMark.Uint64()
 	// wait for watermark to update
 	wait := 0
 	for {
 		if committed == 0 {
-			LogInfo("[2.1 CommitTokenMint]\t No vault TO mint/withdraw tx called")
+			LogInfo("[2.4 CommitTokenMint]\t No vault TO mint/withdraw tx called")
 			break
 		}
 		var waterMark *big.Int
@@ -1353,11 +1430,11 @@ func (xdefiContext *XdefiContext) commitTokenMints(
 		}
 		sentinel.LogRpcStat("vault", "TokenMappingWatermark")
 		LogInfo(
-			"[2.1 CommitTokenMint]\t Vault TO: watermark: %d, before: %d, committed: %d",
+			"[2.4 CommitTokenMint]\t Vault TO: watermark: %d, before: %d, committed: %d",
 			waterMark, waterMarkBefore, committed,
 		)
 		if err != nil {
-			log.Errorf("[2.1 CommitTokenMint]\t Err with calling vault Y watermark: %v", err)
+			log.Errorf("[2.4 CommitTokenMint]\t Err with calling vault Y watermark: %v", err)
 			continue
 		}
 
@@ -1369,7 +1446,7 @@ func (xdefiContext *XdefiContext) commitTokenMints(
 		wait += 1
 		if wait > 20 {
 			LogInfo(
-				"[2.1 CommitTokenMint]\t Vault Y watermark wait time out, "+
+				"[2.4 CommitTokenMint]\t Vault Y watermark wait time out, "+
 					"watermark: %d, before: %d, committed: %d",
 				waterMark, waterMarkBefore, committed,
 			)
@@ -1377,7 +1454,7 @@ func (xdefiContext *XdefiContext) commitTokenMints(
 		}
 		if len(newConfigChan) > 0 {
 			newConfigVersion := <-newConfigChan
-			LogInfo("[2.1 CommitTokenMint]\t new config version received: %d -> %d",
+			LogInfo("[2.4 CommitTokenMint]\t new config version received: %d -> %d",
 				xdefiContext.ConfigVersion, newConfigVersion,
 			)
 			if newConfigVersion > xdefiContext.ConfigVersion {
@@ -1443,7 +1520,7 @@ func (xdefiContext *XdefiContext) CommitTokenMints(
 				return
 			}
 		case <-ticker.C:
-			if time.Now().After(lastCall.Add(VaultCheckInterval * time.Second)) {
+			if !(time.Now().After(lastCall.Add(VaultCheckInterval * time.Second))) {
 				continue
 			}
 
@@ -1518,11 +1595,11 @@ func (xdefiContext *XdefiContext) validatePrepareMints(
 ) {
 	LogInfo := xdefiContext.LogInfo()
 	LogErr := xdefiContext.LogErr()
-	clientY := xdefiContext.ClientY
+	clientTo := xdefiContext.ClientTo()
 	transactor := sentinel.getTransactor(
-		clientY,
+		clientTo,
 		DefaultGasPrice,
-		DefaultGasLimit,
+		0,
 	)
 
 	tx, err := xdefiContext.VaultY.RejectMint(
@@ -1568,7 +1645,7 @@ func (xdefiContext *XdefiContext) RejectTokenMints(
 				return
 			}
 		case <-ticker.C:
-			if time.Now().After(lastCall.Add(VaultCheckInterval * time.Second)) {
+			if !(time.Now().After(lastCall.Add(VaultCheckInterval * time.Second))) {
 				continue
 			}
 
@@ -1688,8 +1765,8 @@ func (xdefiContext *XdefiContext) commitVaultEvents(
 	// setup transactor
 	transactor := sentinel.getTransactor(
 		clientXevents,
-		DefaultGasPrice,
-		DefaultGasLimit,
+		DefaultGasPriceXchain,
+		0, // force to use estimate gas
 	)
 
 	// order the commit sequence by nonce
@@ -1723,7 +1800,7 @@ func (xdefiContext *XdefiContext) commitVaultEvents(
 	errors := []uint64{}
 	succeeded := []uint64{}
 	xeventsVaultEventExts := []xevents.XEventsVaultEventExt{}
-	// commit all events in order
+	// make all events in order
 	for _, nonce := range nonces {
 		vaultEventHash = noncesMap[nonce]
 		vaultEventWithSig := sentinel.VaultEvents[vaultEventHash]
@@ -1769,23 +1846,25 @@ func (xdefiContext *XdefiContext) commitVaultEvents(
 			allNonces = append(allNonces, event.Nonce.Uint64())
 		}
 		LogInfo("[1.3 commitVaultEvents]\t record vault event batch: %v", allNonces)
+		// 1.3 issue transaction
 		tx, err := xeventsContract.RecordVaultEventBatch(
 			transactor, xeventsVaultEventExts,
 		)
 		sentinel.LogRpcStat("xevents", "Store Batch")
-		//transactor.Nonce = big.NewInt(transactor.Nonce.Int64() + 1)
 		if err != nil {
-			LogErr("[1.3 commitVaultEvents]\t Vault FROM sentinel xevents store err: "+
-				"%v, nonce: %d, gaslimit: %d, gasPrice: %d",
-				err, transactor.Nonce, transactor.GasLimit, transactor.GasPrice)
+			LogErr("[1.3 commitVaultEvents]\t TXs:%d Vault FROM sentinel xevents store err: "+
+				"%v, gaslimit: %d, gasPrice: %d",
+				transactor.Nonce, err, transactor.GasLimit, transactor.GasPrice,
+			)
 			for _, event := range xeventsVaultEventExts {
 				errors = append(errors, event.Nonce.Uint64())
 			}
 		} else {
 			LogInfo(
-				"[1.3 commitVaultEvents]\t Vault FROM sentinel xevents store tx: "+
-					"%x, from: %x, nonce: %d",
-				tx.Hash(), sentinel.key.Address.Bytes(), tx.Nonce(),
+				"[1.3 commitVaultEvents] TXs:%d Vault FROM sentinel xevents store tx: "+
+					"%x, from: %x, gaslimit: %d, gasPrice: %d",
+				tx.Nonce(), tx.Hash(), sentinel.key.Address.Bytes(),
+				tx.GasLimit(), tx.GasPrice(),
 			)
 			for _, event := range xeventsVaultEventExts {
 				committed = append(committed, event.Nonce.Uint64())
