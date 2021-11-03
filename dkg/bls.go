@@ -75,7 +75,7 @@ func (bls *BLS) GetPublicShares(n int) []*share.PubShare {
 	return (*blslib.BLS)(bls).GetPublicShares(n)
 }
 
-func (bls *BLS) GenerateRandomNumber(toSign []byte, sigs map[int][]byte) (VSSResult, error) {
+func (bls *BLS) GenerateRandomNumber(toSign []byte, sigs map[int64][]byte) (VSSResult, error) {
 	r, err := (*blslib.BLS)(bls).GenerateRandomNumber(toSign, sigs)
 	return VSSResult(r), err
 }

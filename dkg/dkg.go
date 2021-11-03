@@ -488,7 +488,7 @@ func (dkg *DKG) ValidateBLSSig(
 
 func (dkg *DKG) HandleSigShares() {
 	// blockhash -> nodexindex -> sigshare
-	var allSigShares = make(map[string]map[int][]byte)
+	var allSigShares = make(map[string]map[int64][]byte)
 
 	for {
 		sigShare := <-dkg.Vss.SigShareChan
@@ -496,9 +496,9 @@ func (dkg *DKG) HandleSigShares() {
 		log.Debugf("---------------- receive sigShare: hash: %x, key: %s", sigShare.Hash().Bytes()[:8], sigShare.Key())
 
 		if _, ok := allSigShares[sigShareKey]; !ok {
-			allSigShares[sigShareKey] = make(map[int][]byte)
+			allSigShares[sigShareKey] = make(map[int64][]byte)
 		}
-		allSigShares[sigShareKey][sigShare.FromIndex] = sigShare.Sig
+		allSigShares[sigShareKey][sigShare.FromIndex.Int64()] = sigShare.Sig
 
 		/*
 			// update each node's height

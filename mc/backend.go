@@ -38,6 +38,7 @@ import (
 	"github.com/MOACChain/xchain/accounts"
 	"github.com/MOACChain/xchain/consensus"
 	"github.com/MOACChain/xchain/consensus/ethash"
+	"github.com/MOACChain/xchain/consensus/pos"
 	"github.com/MOACChain/xchain/core"
 	"github.com/MOACChain/xchain/core/bloombits"
 	"github.com/MOACChain/xchain/dkg"
