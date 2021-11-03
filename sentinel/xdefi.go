@@ -974,11 +974,12 @@ func (xdefiContext *XdefiContext) confirmVaultEvents(
 		// wait till one block is mined and all txs in the batch confirmed
 		if blockNumberAfter > blockNumberBefore && len(succeeded) == len(batch.Batch) {
 			xevents := xdefiContext.Xevents()
-			_, err := xevents.UpdateVaultWatermark(
+			tx, err := xevents.UpdateVaultWatermark(
 				transactor,
 				batch.Vault,
 				big.NewInt(int64(batch.End)),
 			)
+			LogInfo("[PendingVaultEvents]\t UpdateVaultWatermark tx: %x", tx.Hash())
 			LogInfo("[PendingVaultEvents]\t MOVE vault watermark HIGHER to %d, err: %v",
 				batch.End, err,
 			)
@@ -1120,6 +1121,7 @@ func (xdefiContext *XdefiContext) forwardVaultEvents(
 					vaultEvent.Tip,
 					vaultEvent.Nonce,
 				)
+				LogInfo("[ForwardVaultEvents]\t Mint tx: %x", tx.Hash())
 				sentinel.LogRpcStat("vault", "Mint")
 
 			} else {
@@ -1132,6 +1134,7 @@ func (xdefiContext *XdefiContext) forwardVaultEvents(
 					vaultEvent.Tip,
 					vaultEvent.Nonce,
 				)
+				LogInfo("[ForwardVaultEvents]\t Withdraw tx: %x", tx.Hash())
 				sentinel.LogRpcStat("vault", "Withdraw")
 			}
 
@@ -1440,6 +1443,7 @@ func (xdefiContext *XdefiContext) commitVaultEvents(
 		tx, err := xeventsCnt.RecordVaultEventBatch(
 			transactor, xeventsVaultEventExts,
 		)
+		LogInfo("[commitVaultEvents]\t RecordVaultEventBatch tx: %x", tx.Hash())
 		sentinel.LogRpcStat("xevents", "Store Batch")
 		//transactor.Nonce = big.NewInt(transactor.Nonce.Int64() + 1)
 		if err != nil {
